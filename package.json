@@ -2,6 +2,10 @@
   "name": "lazurio-personalspace-gen3",
   "private": true,
   "type": "module",
+  "packageManager": "bun@1.4.0",
+  "engines": {
+    "bun": "1.4.0"
+  },
   "scripts": {
     "bootstrap": "bun scripts/bootstrap-personalspace.mjs",
     "audit:history": "bun scripts/audit-history.mjs",
