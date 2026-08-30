@@ -14,7 +14,7 @@
 
 import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
-import { basename, join, resolve } from "node:path";
+import { basename, dirname, join, resolve } from "node:path";
 
 import { runCommand as defaultRunCommand } from "./command-runner.mjs";
 import {
@@ -326,8 +326,21 @@ export function collectPersonalspaceChecks({
   // Remotes se sem záměrně nepředávají: pozorování remotu má vlastní kontroly
   // (`*.origin_remote`), které umí rozlišit „ukazuje jinam" od „nešlo přečíst".
   // Kdyby je validovala i tahle agregace, jedna vada by se hlásila dvakrát.
+  let materializedDirectoryName = basename(resolve(cwd));
+  const dotGitPath = join(cwd, ".git");
+  try {
+    if (existsSync(dotGitPath) && !existsSync(join(dotGitPath, "HEAD"))) {
+      const commonDir = observe(runCommand, "git", ["rev-parse", "--path-format=absolute", "--git-common-dir"], cwd);
+      if (commonDir.ran && commonDir.status === 0 && basename(commonDir.stdout.trim()) === ".git") {
+        materializedDirectoryName = basename(dirname(commonDir.stdout.trim()));
+      }
+    }
+  } catch {
+    // Neznámý Git layout nesmí vypnout validaci; použije se cwd basename.
+  }
   const stateFailures = validatePersonalState(personal, manifest, {
-    directoryName: basename(resolve(cwd)),
+    directoryName: materializedDirectoryName,
+    buddyMode: "hosted",
   });
   checks.push(stateFailures.length > 0
     ? fail("personalspace.profile_materialization", "required", "Materializace profilu", "personal.gen3.json / modules.manifest.json neodpovídá kontraktu Personalspace.", { details: stateFailures, paths: ["personal.gen3.json", "modules.manifest.json"] })
@@ -374,8 +387,8 @@ export function collectPersonalspaceChecks({
 
   const ignoreProbes = [
     "secrets/provider/scope/purpose/credential.txt",
-    "gbrain",
-    "buddy",
+    "gbrain/.privacy-probe",
+    "buddy/.privacy-probe",
     "workspace/example-private-module",
   ].map((probe) => probeIgnored(runCommand, cwd, probe));
   const unobservedProbes = ignoreProbes.filter((probe) => !probe.observed);

@@ -233,6 +233,39 @@ test("CAC-0071 validátor deleguje Buddy binding do CAC-0072", () => {
   )).toBe(true);
 });
 
+test("hosted validátor přijme explicitní owner Buddy profil bez lokálního runtime", () => {
+  const personal = buildPersonalConfig(personalTemplate, {
+    login: "example",
+    displayName: "Example Owner",
+  });
+  personal.buddy = {
+    slug: "example-buddy",
+    gbrain_path: "gbrain",
+    path: "buddy",
+    repository: {
+      github_repo: "example/example-buddy",
+      visibility: "private",
+      mount_strategy: NESTED_REPO_STRATEGY,
+    },
+    runtime: {
+      github_repo: "HumanAndMachines/Buddy_GEN2",
+      deployment_target: "owner-dedicated-personalspace-vps",
+      local_execution: "forbidden",
+    },
+    hermes: {
+      software_repo: "Lazurio/hermes-agent",
+      profile_format: "hermes-profile-distribution",
+      profile_path: "buddy",
+    },
+  };
+  const manifest = buildModulesManifest({
+    personal_generation: "gen3",
+    owner: "owner-github-username",
+    module_slots: [],
+  }, "example");
+  expect(validatePersonalState(personal, manifest, { buddyMode: "hosted" })).toEqual([]);
+});
+
 test("validace odmítne mount cizího Personalspace", () => {
   const personal = buildPersonalConfig(personalTemplate, {
     login: "example",
