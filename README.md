@@ -130,6 +130,8 @@ materializace profilu — platí dál a beze slevy.
 
 | příkaz | k čemu |
 | --- | --- |
+| `bun run check` | automaticky rozliší distribuční template a materializovanou privátní instanci; v CI instance běží statické privacy a kontraktní kontroly bez přístupu ke gbrainu |
+| `bun run check:instance` | statické kontroly plus živý lokální Doctor nad private GitHub repy a mounty |
 | `bun run doctor` | lidský výpis včetně `BLOCKED` a `N/A` řádků |
 | `bun run doctor:json` | v3 report na stdout; přesně to, co spouští root doctor |
 | `bun run doctor:conformance` | konformní test surfacu proti tomuhle doctorovi |
