@@ -57,8 +57,12 @@ expect(personal.repository?.visibility === "private", "owner repo declaration mu
 expect(personal.repository?.mount_strategy === NESTED_REPO_STRATEGY, "owner repo musí být Doctor-managed nested repo");
 expect(personal.gbrain?.repository?.visibility === "private", "gbrain repo declaration musí zůstat private");
 expect(personal.gbrain?.repository?.mount_strategy === NESTED_REPO_STRATEGY, "gbrain musí být Doctor-managed nested repo");
-expect(personal.gbrain?.software?.github_repo === GBRAIN_SOFTWARE_REPO, "gbrain software repo driftuje");
-expect(personal.gbrain?.software?.install_source === GBRAIN_INSTALL_SOURCE, "gbrain install source driftuje");
+const acceptedGbrainSoftware = new Set([GBRAIN_SOFTWARE_REPO, "Lazurio/gbrain"]);
+expect(acceptedGbrainSoftware.has(personal.gbrain?.software?.github_repo), "gbrain software repo není schválený upstream ani fork-of-record");
+expect(
+  personal.gbrain?.software?.install_source === `github:${personal.gbrain?.software?.github_repo}`,
+  "gbrain install source neodpovídá deklarovanému software repu",
+);
 expect(personal.gbrain?.default_shared === false, "gbrain.default_shared musí být false");
 expect(personal.gbrain?.agent_access === "mcp-only", "gbrain.agent_access musí být mcp-only");
 expect(personal.privacy?.default_share === "private", "privacy.default_share musí být private");

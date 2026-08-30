@@ -206,6 +206,7 @@ export function validatePersonalState(config, manifest, {
   directoryName = null,
   ownerRemote = null,
   gbrainRemote = null,
+  buddyMode = "reject",
 } = {}) {
   const failures = [];
   if (config?.schema_version !== PERSONAL_SCHEMA_VERSION) {
@@ -255,10 +256,12 @@ export function validatePersonalState(config, manifest, {
   if (ownerRemote && !reposEqual(parseGitHubRemote(ownerRemote), identity.repo)) {
     failures.push(`origin remote musí ukazovat na ${identity.repo}`);
   }
-  if (config.buddy !== undefined) {
+  if (config.buddy !== undefined && buddyMode !== "hosted") {
     failures.push(
       "CAC-0071 validátor necertifikuje Buddy-enabled Personalspace; použij oddělený CAC-0072 hosted validátor a runtime/privacy gate",
     );
+  } else if (config.buddy !== undefined) {
+    failures.push(...hostedBuddyStateIssues(config.buddy, login));
   }
   if (config.gbrain?.path !== "gbrain") failures.push("gbrain.path musí být gbrain");
   if (String(config.gbrain?.repository?.visibility).toLowerCase() !== "private") {
@@ -267,11 +270,12 @@ export function validatePersonalState(config, manifest, {
   if (config.gbrain?.repository?.mount_strategy !== NESTED_REPO_STRATEGY) {
     failures.push(`gbrain.repository.mount_strategy musí být ${NESTED_REPO_STRATEGY}`);
   }
-  if (config.gbrain?.software?.github_repo !== GBRAIN_SOFTWARE_REPO) {
-    failures.push(`gbrain software repo musí být ${GBRAIN_SOFTWARE_REPO}`);
+  const gbrainSoftwareRepo = config.gbrain?.software?.github_repo;
+  if (![GBRAIN_SOFTWARE_REPO, "Lazurio/gbrain"].includes(gbrainSoftwareRepo)) {
+    failures.push(`gbrain software repo musí být ${GBRAIN_SOFTWARE_REPO} nebo Lazurio/gbrain`);
   }
-  if (config.gbrain?.software?.install_source !== GBRAIN_INSTALL_SOURCE) {
-    failures.push(`gbrain install source musí být ${GBRAIN_INSTALL_SOURCE}`);
+  if (config.gbrain?.software?.install_source !== `github:${gbrainSoftwareRepo}`) {
+    failures.push("gbrain install source musí odpovídat deklarovanému software repu");
   }
   if (config.gbrain?.default_shared !== false) {
     failures.push("gbrain.default_shared musí být false");
@@ -320,6 +324,34 @@ export function validatePersonalState(config, manifest, {
   ) {
     failures.push("modul bez buddy bindingu nesmí vyžadovat roli buddy");
   }
+  return failures;
+}
+
+function hostedBuddyStateIssues(buddy, login) {
+  const failures = [];
+  if (typeof buddy?.slug !== "string" || buddy.slug.trim() === "") failures.push("buddy.slug musí být neprázdný");
+  if (buddy?.gbrain_path !== "gbrain") failures.push("buddy.gbrain_path musí být gbrain");
+  if (buddy?.path !== "buddy") failures.push("buddy.path musí být buddy");
+  const profileRepo = normalizeRepoSlug(buddy?.repository?.github_repo);
+  if (!profileRepo) {
+    failures.push("buddy.repository.github_repo musí být explicitní owner/repo");
+  } else if (profileRepo.split("/")[0].toLowerCase() !== login.toLowerCase()) {
+    failures.push("Buddy profile repo musí patřit vlastníkovi Personalspace");
+  }
+  if (buddy?.repository?.visibility !== "private") failures.push("Buddy profile repo musí být private");
+  if (buddy?.repository?.mount_strategy !== NESTED_REPO_STRATEGY) {
+    failures.push(`Buddy profile repo musí používat ${NESTED_REPO_STRATEGY}`);
+  }
+  if (!normalizeRepoSlug(buddy?.runtime?.github_repo)) failures.push("Buddy runtime github_repo musí být explicitní owner/repo");
+  if (buddy?.runtime?.deployment_target !== "owner-dedicated-personalspace-vps") {
+    failures.push("Buddy runtime musí běžet na owner-dedicated-personalspace-vps");
+  }
+  if (buddy?.runtime?.local_execution !== "forbidden") failures.push("Buddy runtime local_execution musí být forbidden");
+  if (!normalizeRepoSlug(buddy?.hermes?.software_repo)) failures.push("buddy.hermes.software_repo musí být explicitní owner/repo");
+  if (buddy?.hermes?.profile_format !== "hermes-profile-distribution") {
+    failures.push("buddy.hermes.profile_format musí být hermes-profile-distribution");
+  }
+  if (buddy?.hermes?.profile_path !== "buddy") failures.push("buddy.hermes.profile_path musí být buddy");
   return failures;
 }
 

@@ -253,7 +253,8 @@ export async function bootstrapPersonalspace(options, {
   assertPrivate(repoInfo(identity.repo, personalspaceRoot), identity.repo);
   assertIgnored(layout.conglomerateRoot, identity.mountPath);
   assertIgnored(personalspaceRoot, "secrets/provider/scope/purpose/credential.txt");
-  assertIgnored(personalspaceRoot, "gbrain");
+  assertIgnored(personalspaceRoot, "gbrain/.privacy-probe");
+  assertIgnored(personalspaceRoot, "buddy/.privacy-probe");
   assertIgnored(personalspaceRoot, "workspace/example-private-module");
   assertNoGitlinks(layout.conglomerateRoot);
   assertNoGitlinks(personalspaceRoot);
