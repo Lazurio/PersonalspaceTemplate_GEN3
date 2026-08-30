@@ -28,6 +28,8 @@ const marker = JSON.parse(await readFile(join(root, "personalspace.template.json
 const ignore = await readFile(join(root, ".gitignore"), "utf8");
 const readme = await readFile(join(root, "README.md"), "utf8");
 const license = await readFile(join(root, "LICENSE.md"), "utf8");
+const packageJson = JSON.parse(await readFile(join(root, "package.json"), "utf8"));
+const checksWorkflow = await readFile(join(root, ".github", "workflows", "checks.yml"), "utf8");
 
 expect(personal.owner?.github_username === OWNER_PLACEHOLDER, "owner placeholder driftuje");
 expect(personal.schema_version === PERSONAL_SCHEMA_VERSION, "personal schema version driftuje");
@@ -63,6 +65,10 @@ expect(license.includes("FSL-1.1-Apache-2.0"), "chybí výslovná FSL licence");
 expect(marker.schema_version === PERSONALSPACE_TEMPLATE_VERSION, "template marker version driftuje");
 expect(marker.template_repo === PERSONALSPACE_TEMPLATE_REPO, "template marker repo driftuje");
 expect(marker.personal_schema_version === PERSONAL_SCHEMA_VERSION, "template marker personal schema driftuje");
+expect(packageJson.packageManager === "bun@1.4.0", "packageManager musí vlastnit exact Bun 1.4.0");
+expect(packageJson.engines?.bun === "1.4.0", "engines.bun musí odpovídat exact Bun 1.4.0");
+expect(checksWorkflow.includes("bun-version-file: package.json"), "CI musí číst Bun verzi z package.json");
+expect(!checksWorkflow.includes("bun-version:"), "CI nesmí držet druhý hardcoded Bun pin");
 
 const staged = runCommand("git", ["ls-files", "-s"], { cwd: root }).stdout;
 const gitlinks = gitlinkPaths(staged);
