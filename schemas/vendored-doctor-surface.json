@@ -1,0 +1,34 @@
+{
+  "schema_version": "humanandmachines.vendored-doctor-surface.v1",
+  "why": "Personalspace doctor musí běžet SAMOSTATNĚ. Na Buddy VPS je v <login>_GEN3 Personalspace a nad ním už žádný Lazurio root, ze kterého by šlo společný surface naimportovat. Proto je tu byte-identický self-contained compatibility snapshot, ne runtime import.",
+  "source": {
+    "distribution": "embedded-compatibility-snapshot",
+    "decision": "0118",
+    "snapshot": "doctor-surface-v3-2026-07-29"
+  },
+  "pin_status": "Snapshot obsahuje společný doctor v3 kontrakt včetně `children[].outcome = signalled` a bezpečného omezení deklarovaného `doctor.cwd` na mount. Až se společný surface změní, převezme se celý jako jeden reviewovaný celek; každá změna kteréhokoli ze čtyř souborů rozbije sha256 níž a shodí bránu. Snapshot se tady neopravuje po jednotlivých souborech, protože by vznikl tichý fork kontraktu.",
+  "unused_here": "Sporné cesty jsou v tomhle repu spící: `runChildDoctor`, `buildAggregateReport` i `childDefectCheck` vlastní ROOT doctor a Personalspace doctor je vždycky potomek — žádná z nich se tu nevolá. Ověřitelné grepem: mimo samotný scripts/doctor-surface-lib.mjs se ta jména v repu nevyskytují.",
+  "drift": "Kopie se nesmí editovat na místě. Kdo ji upraví, musí přepsat i sha256 níž — tím je zásah do cizího souboru vidět v diffu. Runtime drift chytá root doctor: jeho vlastní kopie schématu report tohohle doctora znovu validuje a nesoulad hlásí jako children[].outcome = 'schema_invalid', nikdy jako tichou zelenou.",
+  "files": [
+    {
+      "path": "schemas/doctor-report.schema.json",
+      "source_path": "schemas/doctor-report.schema.json",
+      "sha256": "0bdf0184dcb7fb1a95e312c01cec448d0deaaebf0acc7bd09c3afa5ec4380036"
+    },
+    {
+      "path": "scripts/json-schema-mini.mjs",
+      "source_path": "scripts/json-schema-mini.mjs",
+      "sha256": "c08dc53c7ed945af5621ca2e102160f1c4a29bd8fd8e85c5440d39152e694dd6"
+    },
+    {
+      "path": "scripts/doctor-surface-lib.mjs",
+      "source_path": "scripts/doctor-surface-lib.mjs",
+      "sha256": "0e5dd714e7506c28f5f4f62322a18b3ea7771bd41b4e32abbf0d8ce76a5c9b82"
+    },
+    {
+      "path": "scripts/doctor-conformance.mjs",
+      "source_path": "scripts/doctor-conformance.mjs",
+      "sha256": "bd6cfe3f4acb934c27840e7ae157735e65a008a4e4abb7d65c8d51ea2a687355"
+    }
+  ]
+}

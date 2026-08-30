@@ -1,0 +1,16 @@
+{
+  "personal_generation": "gen3",
+  "owner": "owner-github-username",
+  "module_slots": [
+    {
+      "path": "workspace/personal-notes",
+      "category": "knowledge",
+      "default_access": "private",
+      "required_roles": [
+        "owner"
+      ],
+      "source_of_truth": "git-native",
+      "notes": "Example personal module slot; replace or remove when creating real private nested modules."
+    }
+  ]
+}

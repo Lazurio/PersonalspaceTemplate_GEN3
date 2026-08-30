@@ -1,0 +1,18 @@
+{
+  "name": "lazurio-personalspace-gen3",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "bootstrap": "bun scripts/bootstrap-personalspace.mjs",
+    "audit:history": "bun scripts/audit-history.mjs",
+    "check": "bun scripts/check-template.mjs && bun scripts/audit-history.mjs && bun run check:doctor-surface && bun test scripts/personalspace-lib.test.mjs scripts/agent-skills-entrypoint.test.mjs && bun run doctor:agent-skills",
+    "check:doctor-surface": "bun scripts/check-vendored-surface.mjs && bun test scripts/doctor-personalspace.test.mjs",
+    "doctor:agent-skills": "bun scripts/agent-skills-entrypoint.mjs check",
+    "repair:agent-skills": "bun scripts/agent-skills-entrypoint.mjs repair",
+    "check:instance": "bun test scripts/personalspace-lib.test.mjs scripts/doctor-personalspace.test.mjs && bun run doctor",
+    "doctor": "bun scripts/doctor-personalspace.mjs",
+    "doctor:json": "bun scripts/doctor-personalspace.mjs --json",
+    "doctor:conformance": "bun scripts/doctor-conformance.mjs -- bun scripts/doctor-personalspace.mjs --json",
+    "test": "bun test scripts/personalspace-lib.test.mjs scripts/doctor-personalspace.test.mjs"
+  }
+}

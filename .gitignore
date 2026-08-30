@@ -1,0 +1,54 @@
+# OS junk
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Local env and secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+secrets/
+secrets/**
+
+# Runtime and generated state
+node_modules/
+**/node_modules/
+.cache/
+dist/
+build/
+out/
+coverage/
+*.log
+logs/
+
+# Python/local tooling caches
+__pycache__/
+**/__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Samostatné private gbrain data repo se mountuje jako nested checkout.
+# Super-repo ho nikdy netrackuje jako gitlink ani běžný adresář.
+gbrain/
+
+# Volitelný private Buddy profile je také nested checkout. CAC-0071 jej
+# nevytváří, ale existující hosted instance ho nesmí omylem trackovat.
+buddy/
+
+# Soukromé osobní moduly jsou Doctor-managed nested checkouty.
+workspace/*
+!workspace/.gitkeep
+
+# Editor state
+.idea/
+.cursor/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json

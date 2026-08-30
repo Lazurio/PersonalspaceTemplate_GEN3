@@ -1,0 +1,10 @@
+# Vendorovaný společný surface doctorů (decision 0118) je BYTE-IDENTICKÝ
+# compatibility snapshot. Aby to tvrzení platilo i na Windows, kde by
+# checkout jinak přepsal LF na CRLF, se u těchhle souborů vypíná eol konverze.
+# Scénář, kvůli kterému to tu je: bez tohohle řádku hlásila brána
+# check:doctor-surface na Windows runneru rozdílné sha256 u všech čtyř souborů,
+# přestože v Gitu nikdo nic nezměnil.
+schemas/doctor-report.schema.json -text
+scripts/doctor-surface-lib.mjs -text
+scripts/doctor-conformance.mjs -text
+scripts/json-schema-mini.mjs -text

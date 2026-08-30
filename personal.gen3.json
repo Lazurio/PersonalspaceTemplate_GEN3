@@ -1,0 +1,50 @@
+{
+  "$schema": "https://rozjedeme.ai/schemas/personal.gen3.schema.json",
+  "schema_version": "humanandmachines.personal.gen3.v1",
+  "personal_generation": "gen3",
+  "owner": {
+    "github_username": "owner-github-username",
+    "display_name": "Owner Display Name",
+    "type": "human"
+  },
+  "repository": {
+    "github_repo": "owner-github-username/owner-github-username_GEN3",
+    "mount_path": "personalspace/owner-github-username_GEN3",
+    "visibility": "private",
+    "mount_strategy": "doctor-managed-nested-repo"
+  },
+  "privacy": {
+    "default_share": "private",
+    "agent_boundary": "personal-context-only",
+    "shared_outputs": "metadata-only"
+  },
+  "doctor": {
+    "schema_version": "humanandmachines.doctor.declaration.v1",
+    "command": ["bun", "scripts/doctor-personalspace.mjs", "--json"],
+    "timeout_ms": 120000,
+    "scope_type": "personalspace"
+  },
+  "modules_manifest_path": "modules.manifest.json",
+  "workspace_path": "workspace",
+  "gbrain": {
+    "path": "gbrain",
+    "repository": {
+      "github_repo": "owner-github-username/owner-github-username-gbrain",
+      "visibility": "private",
+      "mount_strategy": "doctor-managed-nested-repo"
+    },
+    "software": {
+      "github_repo": "garrytan/gbrain",
+      "install_source": "github:garrytan/gbrain"
+    },
+    "default_shared": false,
+    "human_editor": "obsidian",
+    "agent_access": "mcp-only"
+  },
+  "secrets": {
+    "path": "secrets",
+    "custody_pattern": "personalspace/<owner>_GEN3/secrets/<provider>/<scope>/<purpose>",
+    "git": "ignored"
+  },
+  "shared_spaces": []
+}
