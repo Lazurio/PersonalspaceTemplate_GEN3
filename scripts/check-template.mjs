@@ -65,8 +65,8 @@ expect(license.includes("FSL-1.1-Apache-2.0"), "chybí výslovná FSL licence");
 expect(marker.schema_version === PERSONALSPACE_TEMPLATE_VERSION, "template marker version driftuje");
 expect(marker.template_repo === PERSONALSPACE_TEMPLATE_REPO, "template marker repo driftuje");
 expect(marker.personal_schema_version === PERSONAL_SCHEMA_VERSION, "template marker personal schema driftuje");
-expect(packageJson.packageManager === "bun@1.4.0", "packageManager musí vlastnit exact Bun 1.4.0");
-expect(packageJson.engines?.bun === "1.4.0", "engines.bun musí odpovídat exact Bun 1.4.0");
+expect(packageJson.packageManager === "bun@1.4.2", "packageManager musí vlastnit exact Bun 1.4.2");
+expect(packageJson.engines?.bun === "1.4.0", "engines.bun musí odpovídat exact Bun 1.4.2");
 expect(checksWorkflow.includes("bun-version-file: package.json"), "CI musí číst Bun verzi z package.json");
 expect(!checksWorkflow.includes("bun-version:"), "CI nesmí držet druhý hardcoded Bun pin");
 
