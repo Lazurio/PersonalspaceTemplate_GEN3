@@ -46,6 +46,10 @@ buddy/
 workspace/*
 !workspace/.gitkeep
 
+# Task worktree tohoto repa patří vedle něj do personalspace/.worktrees/<task>.
+# Kdyby přece vznikl uvnitř, Git ho netrackuje.
+.worktrees/
+
 # Editor state
 .idea/
 .cursor/

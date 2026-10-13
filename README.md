@@ -99,7 +99,9 @@ owner a platform-operator kroků a viditelnými `BLOCKED` gaty.
 - `personal.gen3.json` — vlastník, privacy hranice a repo kontrakty; výchozí
   template nemá blok `buddy`.
 - `personalspace.template.json` — veřejný marker původu a verze bootstrapu.
-- `modules.manifest.json` — owner-scoped sloty privátních osobních modulů.
+- `modules.manifest.json` — owner-scoped sloty privátních osobních modulů
+  a jejich `module_port_pool` (vyhrazený rozsah 23000–23099; osobní modul
+  zakládá `lazurio module create personalspace/<slug>`).
 - `workspace/` — gitignored/nested privátní repozitáře osobních aplikací.
 - `gbrain/` — celý gitignored mount samostatného private Markdown data repa.
 - `manual/` — bootstrap, migrace a recovery.

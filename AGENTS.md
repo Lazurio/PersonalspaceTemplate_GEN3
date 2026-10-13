@@ -129,9 +129,24 @@ Název adresáře musí odpovídat `owner.github_username + "_GEN3"` a
 
 ## Osobní moduly
 
-Privátní nested repozitáře vytvářej pod `workspace/` a deklaruj je
-v `modules.manifest.json`. Defaultní přístup je private a moduly se nesmějí
-objevit v Organization discovery.
+Osobní modul je soukromý repozitář `<login>/<slug>` na GitHub účtu vlastníka,
+checkout v `workspace/<slug>` a slot v `modules.manifest.json` (Lazurio
+decision 0171, dodatek z 2026-10-13). Nezakládej ho ručně:
+
+1. `lazurio module create personalspace/<slug> --stack <stack> --dry-run`
+   ukáže plán (repozitář, soubory, port) a nic nezapíše. Ukaž ho vlastníkovi.
+2. Teprve po jeho potvrzení týž příkaz s `--confirm <plan>` založí soukromý
+   repozitář, pushne první commit, umístí checkout do `workspace/<slug>`
+   a zapíše slot do `modules.manifest.json` task worktree.
+3. Slot jde pull requestem do tohoto repa; merge je Publikace vlastníka.
+
+Task worktree tohoto repa patří vedle něj do `personalspace/.worktrees/<task>`,
+nikdy jako druhý adresář v `personalspace/` (Lazurio by pak nevědělo, který
+Personalspace je vlastníkův). Lease osobních modulů leží v `module_port_pool`
+tohoto manifestu, ve vyhrazeném rozsahu 23000–23099, který pooly Organizací
+nepoužívají; Personalspace bez poolu ho dostane v pull requestu se slotem
+prvního modulu. Defaultní přístup je private, collaboratory se nepřidávají
+a moduly se nesmějí objevit v Organization discovery.
 
 ## Agent skills
 

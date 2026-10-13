@@ -18,6 +18,15 @@ export const NESTED_REPO_STRATEGY = "doctor-managed-nested-repo";
 export const DOCTOR_DECLARATION_SCHEMA_VERSION = "humanandmachines.doctor.declaration.v1";
 export const DOCTOR_SCOPE_TYPE = "personalspace";
 export const DOCTOR_COMMAND = Object.freeze(["bun", "scripts/doctor-personalspace.mjs", "--json"]);
+/**
+ * Vyhrazený rozsah portů osobních modulů (Lazurio decision 0171, dodatek
+ * z 2026-10-13; LazurioPlatform F52). Personalspace ho deklaruje jako
+ * `module_port_pool` v `modules.manifest.json` a pooly Organizací ho nikdy
+ * nepoužívají. `lazurio module create personalspace/<slug>` z něj bere lease
+ * nového osobního modulu a Personalspace bez poolu ho dostane v pull requestu
+ * se slotem prvního modulu.
+ */
+export const PERSONAL_MODULE_PORT_POOL = Object.freeze({ start: 23000, end: 23099 });
 
 const githubLoginPattern = /^[A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?$/;
 const repoNamePattern = /^[A-Za-z0-9_.-]+$/;
@@ -202,6 +211,32 @@ export function buildModulesManifest(template, login) {
   return output;
 }
 
+/**
+ * `module_port_pool` osobního prostoru: smí chybět (Personalspace z doby před
+ * vyhrazeným rozsahem ho dostane se slotem prvního modulu), a když ho manifest
+ * deklaruje, leží celý ve vyhrazeném rozsahu.
+ */
+export function modulePortPoolIssues(manifest) {
+  if (!manifest || typeof manifest !== "object" || !Object.hasOwn(manifest, "module_port_pool")) {
+    return [];
+  }
+  const pool = manifest.module_port_pool;
+  const keys = pool && typeof pool === "object" && !Array.isArray(pool) ? Object.keys(pool) : null;
+  const { start, end } = PERSONAL_MODULE_PORT_POOL;
+  if (
+    keys === null
+    || keys.some((key) => key !== "start" && key !== "end")
+    || !Number.isInteger(pool.start)
+    || !Number.isInteger(pool.end)
+    || pool.start > pool.end
+    || pool.start < start
+    || pool.end > end
+  ) {
+    return [`modules.manifest.json module_port_pool musí být {"start", "end"} uvnitř vyhrazeného rozsahu ${start}-${end}`];
+  }
+  return [];
+}
+
 export function validatePersonalState(config, manifest, {
   directoryName = null,
   ownerRemote = null,
@@ -317,6 +352,7 @@ export function validatePersonalState(config, manifest, {
   if (!Array.isArray(manifest?.module_slots)) {
     failures.push("modules.manifest.json module_slots musí být pole");
   }
+  failures.push(...modulePortPoolIssues(manifest));
   if (
     config.buddy === undefined
     && Array.isArray(manifest?.module_slots)

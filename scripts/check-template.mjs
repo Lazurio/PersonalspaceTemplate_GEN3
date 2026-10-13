@@ -16,6 +16,7 @@ import {
   PERSONALSPACE_TEMPLATE_REPO,
   PERSONALSPACE_TEMPLATE_VERSION,
   gitlinkPaths,
+  modulePortPoolIssues,
   trackedPathPrivacyIssues,
   trackedTextPrivacyIssues,
 } from "./personalspace-lib.mjs";
@@ -51,6 +52,7 @@ expect(personal.doctor?.scope_type === DOCTOR_SCOPE_TYPE, "doctor.scope_type mus
 expect(existsSync(join(root, personal.doctor?.command?.[1] ?? "")), "deklarovaný doctor entrypoint musí existovat");
 expect(manifest.owner === OWNER_PLACEHOLDER, "modules manifest owner placeholder driftuje");
 expect(!(manifest.module_slots ?? []).some((slot) => slot.required_roles?.includes("buddy")), "slot bez Buddyho nesmí vyžadovat roli buddy");
+for (const issue of modulePortPoolIssues(manifest)) expect(false, issue);
 expect(ignore.split(/\r?\n/).includes("gbrain/"), "super-repo musí celé gbrain/ ignorovat");
 expect(ignore.split(/\r?\n/).includes("buddy/"), "super-repo musí volitelný Buddy checkout ignorovat");
 expect(ignore.split(/\r?\n/).includes("workspace/*"), "super-repo musí osobní module checkouty ignorovat");

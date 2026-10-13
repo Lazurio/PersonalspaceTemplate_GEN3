@@ -12,8 +12,10 @@ import {
   buildPersonalConfig,
   doctorDeclarationIssues,
   expectedIdentity,
+  PERSONAL_MODULE_PORT_POOL,
   gitlinkPaths,
   inferMountLayout,
+  modulePortPoolIssues,
   parseGitHubRemote,
   parseFsckObjectFindings,
   parseLsTreeLongEntries,
@@ -473,4 +475,78 @@ test("chybějící nebo pokažená deklarace doctora je vada, ne ticho", () => {
   delete personal.doctor;
   expect(validatePersonalState(personal, buildModulesManifest({ module_slots: [] }, "example")))
     .toContain("personal.gen3.json musí deklarovat blok doctor (decision 0118)");
+});
+
+test("module_port_pool osobního prostoru smí chybět, jinak leží ve vyhrazeném rozsahu", () => {
+  expect(PERSONAL_MODULE_PORT_POOL).toEqual({ start: 23000, end: 23099 });
+  // Personalspace z doby před vyhrazeným rozsahem: pool dostane se slotem
+  // prvního modulu (lazurio module create personalspace/<slug>).
+  expect(modulePortPoolIssues({ module_slots: [] })).toEqual([]);
+  expect(modulePortPoolIssues({
+    module_port_pool: { start: 23000, end: 23099 },
+    module_slots: [],
+  })).toEqual([]);
+  expect(modulePortPoolIssues({ module_port_pool: { start: 23010, end: 23019 } })).toEqual([]);
+  for (const pool of [
+    { start: 24000, end: 24099 },
+    { start: 22999, end: 23050 },
+    { start: 23050, end: 23100 },
+    { start: 23050, end: 23040 },
+    { start: 23000 },
+    { start: 23000, end: 23099, extra: 1 },
+    { start: "23000", end: 23099 },
+    null,
+    [],
+    "23000-23099",
+  ]) {
+    expect(modulePortPoolIssues({ module_port_pool: pool }), JSON.stringify(pool)).toHaveLength(1);
+  }
+});
+
+test("bootstrap zachová pool šablony a materializace hlídá jeho rozsah", () => {
+  const personal = buildPersonalConfig(personalTemplate, {
+    login: "example",
+    displayName: "Example Owner",
+  });
+  const template = {
+    personal_generation: "gen3",
+    owner: "owner-github-username",
+    module_port_pool: { start: 23000, end: 23099 },
+    module_slots: [],
+  };
+  const manifest = buildModulesManifest(template, "example");
+  expect(manifest.module_port_pool).toEqual({ start: 23000, end: 23099 });
+  expect(validatePersonalState(personal, manifest)).toEqual([]);
+  expect(validatePersonalState(personal, {
+    ...manifest,
+    module_port_pool: { start: 24900, end: 24999 },
+  })).toEqual([
+    "modules.manifest.json module_port_pool musí být {\"start\", \"end\"} uvnitř vyhrazeného rozsahu 23000-23099",
+  ]);
+});
+
+test("slot osobního modulu tak, jak ho deklaruje lazurio module create, projde materializací", () => {
+  const personal = buildPersonalConfig(personalTemplate, {
+    login: "example",
+    displayName: "Example Owner",
+  });
+  const manifest = buildModulesManifest({
+    personal_generation: "gen3",
+    owner: "owner-github-username",
+    module_port_pool: { start: 23000, end: 23099 },
+    module_slots: [{
+      path: "workspace/notes",
+      slug: "notes",
+      space: "workspace",
+      category: "application",
+      default_access: "private",
+      required_roles: ["owner"],
+      source_of_truth: "git-native",
+      status: "active",
+      notes: "Notes: osobní Modul založený příkazem lazurio module create (stack vite-react).",
+      git: { url: "git@github.com:example/notes.git", branch: "main" },
+    }],
+  }, "example");
+  expect(manifest.module_slots[0].required_roles).toEqual(["owner"]);
+  expect(validatePersonalState(personal, manifest)).toEqual([]);
 });
