@@ -122,7 +122,13 @@ Lazurio root `manual/external-app-integrations.md`.
 
 ```text
 <Lazurio-root>/personalspace/<github-username>_GEN3
+<Lazurio-Folder>/personalspace/<github-username>_GEN3
 ```
+
+Lazurio Folder je složka, kterou zakládá Lazurio Platform (`.lazurio/`,
+`AGENTS.md`, `manual/`); není to Git checkout rootu. Bootstrap i doctor ho
+poznají podle `.lazurio/preferences.json` a kořenové Git kontroly v něm
+spouštějí jen tehdy, když Folder leží v nějakém Git repozitáři.
 
 Název adresáře musí odpovídat `owner.github_username + "_GEN3"` a
 `repository.mount_path`. Owner repo i gbrain data repo musejí být private.

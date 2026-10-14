@@ -14,7 +14,7 @@
 
 import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
-import { basename, dirname, join, resolve } from "node:path";
+import { basename, join, resolve } from "node:path";
 
 import { runCommand as defaultRunCommand } from "./command-runner.mjs";
 import {
@@ -22,11 +22,14 @@ import {
   buildSummary,
 } from "./doctor-surface-lib.mjs";
 import {
+  classifyMountParent,
   expectedIdentity,
+  gitWorkTreeOf,
   gitlinkPaths,
   inferMountLayout,
   parseGitHubRemote,
   pendingRepositoryInvitationLabels,
+  primaryCheckoutOf,
   reposEqual,
   trackedRepoPrivacyIssues,
   unexpectedRepositoryCollaborators,
@@ -95,18 +98,30 @@ export function detectRootContext(cwd, login, { fileExists = existsSync } = {}) 
   } catch (error) {
     return {
       mounted: false,
+      folder: false,
       layout: null,
       reason: `Checkout není namountovaný pod Lazurio rootem (${error.message})`,
     };
   }
-  if (!fileExists(join(layout.conglomerateRoot, "launchpad.gen3.json"))) {
+  const parent = classifyMountParent(layout.conglomerateRoot, { fileExists });
+  if (parent === "folder") {
+    // Lazurio Folder Platformy: Lazurio nad mountem je, Git checkout rootu ne.
     return {
       mounted: false,
+      folder: true,
+      layout,
+      reason: "Nad mountpointem personalspace/ je Lazurio Folder (.lazurio/), ne Git checkout Lazurio rootu.",
+    };
+  }
+  if (parent !== "root") {
+    return {
+      mounted: false,
+      folder: false,
       layout,
       reason: "Nad mountpointem personalspace/ není launchpad.gen3.json; žádný Lazurio root tu není.",
     };
   }
-  return { mounted: true, layout, reason: null };
+  return { mounted: true, folder: false, layout, reason: null };
 }
 
 /**
@@ -262,6 +277,7 @@ function rootChecks(runCommand, context, mountPath) {
     ["root.mount_ignored", "Ignorovaný mount", "mountpoint Personalspace v kořeni"],
     ["root.no_gitlinks", "Gitlinky kořene", "kořen bez .gitmodules a gitlinků"],
   ];
+  if (context.folder) return folderRootChecks(runCommand, context, mountPath);
   if (!context.mounted) {
     return ids.map(([id, title, subject]) =>
       notApplicable(id, "required", title, `Nekontrolováno tady: ${subject}. ${context.reason}`, {
@@ -286,6 +302,53 @@ function rootChecks(runCommand, context, mountPath) {
     checks.push(ok("root.mount_ignored", "required", "Ignorovaný mount", `${probe.probe} je v kořeni gitignored.`));
   }
   checks.push(gitlinkCheck(runCommand, "root.no_gitlinks", root, "kořen"));
+  return checks;
+}
+
+/**
+ * Kořenové kontroly pod Lazurio Folderem Platformy. Folder není Git checkout
+ * rootu: kořenový manifest tu není a mount nemá kam uniknout, takže jde
+ * o `not_applicable` / `no_such_mount` — fakt topologie, ne nepozorování.
+ * Leží-li Folder přesto uvnitř nějakého Git repozitáře, mount do něj uniknout
+ * může, a obě Git kontroly proto běží proti němu doopravdy.
+ */
+function folderRootChecks(runCommand, context, mountPath) {
+  const root = context.layout.conglomerateRoot;
+  const absent = (id, title, message) => notApplicable(id, "required", title, message, {
+    not_applicable_reason: "no_such_mount",
+    owner: SELF_CHECK_OWNER,
+  });
+  const checks = [
+    absent("root.launchpad_manifest", "Kořenový manifest", `${context.reason} Kořenový manifest tu není.`),
+  ];
+  const tree = gitWorkTreeOf(root, { runCommand });
+  if (tree === "outside") {
+    const message = `${context.reason} Folder neleží v Git repozitáři, takže mount nemá kam uniknout.`;
+    checks.push(absent("root.mount_ignored", "Ignorovaný mount", message));
+    checks.push(absent("root.no_gitlinks", "Gitlinky kořene", message));
+    return checks;
+  }
+  if (tree === "unknown") {
+    const unobserved = {
+      blocked_reason: "git rev-parse --is-inside-work-tree v Lazurio Folderu neodpověděl",
+      remedy: "Ověř, že je dostupné `git`, a spusť doctor znovu.",
+    };
+    checks.push(blocked("root.mount_ignored", "required", "Ignorovaný mount", "Nešlo ověřit, jestli Lazurio Folder leží v Git repozitáři.", unobserved));
+    checks.push(blocked("root.no_gitlinks", "required", "Gitlinky kořene", "Nešlo ověřit, jestli Lazurio Folder leží v Git repozitáři.", unobserved));
+    return checks;
+  }
+  const probe = probeIgnored(runCommand, root, mountPath ?? context.layout.relativeMount);
+  if (!probe.observed) {
+    checks.push(blocked("root.mount_ignored", "required", "Ignorovaný mount", "Nešlo ověřit, že Git repozitář nad Folderem mount ignoruje.", {
+      blocked_reason: probe.detail || "git check-ignore nad Folderem neodpověděl",
+      remedy: "Oprav Git repozitář, ve kterém Lazurio Folder leží, nebo Folder přesuň mimo něj.",
+    }));
+  } else if (!probe.ignored) {
+    checks.push(fail("root.mount_ignored", "required", "Ignorovaný mount", `${probe.probe} není gitignored v Git repozitáři, ve kterém Lazurio Folder leží.`));
+  } else {
+    checks.push(ok("root.mount_ignored", "required", "Ignorovaný mount", `${probe.probe} je gitignored v Git repozitáři nad Folderem.`));
+  }
+  checks.push(gitlinkCheck(runCommand, "root.no_gitlinks", root, "Git repozitář nad Folderem"));
   return checks;
 }
 
@@ -315,29 +378,21 @@ export function collectPersonalspaceChecks({
     ? ok("personalspace.identity", "required", "Identita vlastníka", `Vlastník ${identity.login}, owner repo ${identity.repo}, gbrain repo ${identity.gbrainRepo}.`)
     : fail("personalspace.identity", "required", "Identita vlastníka", `Identitu vlastníka nejde odvodit: ${identityError}`));
 
-  const context = detectRootContext(cwd, login, { fileExists });
+  // Z task worktree jsou mount, gbrain/, buddy/ i osobní moduly v primárním
+  // checkoutu; trackovaný kontrakt se čte z cwd.
+  const primary = primaryCheckoutOf(cwd, { runCommand, fileExists: existsSync });
+  const context = detectRootContext(primary, login, { fileExists });
   checks.push(...rootChecks(runCommand, context, identity?.mountPath));
 
   const ownerRemote = originRemote(runCommand, cwd);
-  const gbrainRoot = join(cwd, "gbrain");
+  const gbrainRoot = join(primary, "gbrain");
   const gbrainMounted = fileExists(join(gbrainRoot, ".git"));
   const gbrainRemote = gbrainMounted ? originRemote(runCommand, gbrainRoot) : null;
 
   // Remotes se sem záměrně nepředávají: pozorování remotu má vlastní kontroly
   // (`*.origin_remote`), které umí rozlišit „ukazuje jinam" od „nešlo přečíst".
   // Kdyby je validovala i tahle agregace, jedna vada by se hlásila dvakrát.
-  let materializedDirectoryName = basename(resolve(cwd));
-  const dotGitPath = join(cwd, ".git");
-  try {
-    if (existsSync(dotGitPath) && !existsSync(join(dotGitPath, "HEAD"))) {
-      const commonDir = observe(runCommand, "git", ["rev-parse", "--path-format=absolute", "--git-common-dir"], cwd);
-      if (commonDir.ran && commonDir.status === 0 && basename(commonDir.stdout.trim()) === ".git") {
-        materializedDirectoryName = basename(dirname(commonDir.stdout.trim()));
-      }
-    }
-  } catch {
-    // Neznámý Git layout nesmí vypnout validaci; použije se cwd basename.
-  }
+  const materializedDirectoryName = basename(resolve(primary));
   const stateFailures = validatePersonalState(personal, manifest, {
     directoryName: materializedDirectoryName,
     buddyMode: "hosted",
@@ -444,7 +499,7 @@ export function collectPersonalspaceChecks({
       remedy: GBRAIN_CLI_REMEDY,
     }));
 
-  const buddyRoot = join(cwd, "buddy");
+  const buddyRoot = join(primary, "buddy");
   if (!fileExists(buddyRoot)) {
     checks.push(notApplicable("buddy.mount", "optional", "Mount Buddy profilu", "Buddy není podmínkou platného Personalspace a v tomhle checkoutu není namountovaný.", {
       not_applicable_reason: "no_such_mount",
@@ -456,7 +511,7 @@ export function collectPersonalspaceChecks({
     checks.push(ok("buddy.mount", "required", "Mount Buddy profilu", "buddy/ je samostatný Git checkout.", { paths: ["buddy"] }));
   }
 
-  checks.push(...moduleRepoChecks(runCommand, { cwd, manifest, identity, fileExists }));
+  checks.push(...moduleRepoChecks(runCommand, { cwd: primary, manifest, identity, fileExists }));
   return checks;
 }
 

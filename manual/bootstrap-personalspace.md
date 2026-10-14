@@ -17,13 +17,78 @@ Musejí být splněné všechny tyto gaty:
 
 - `Lazurio/PersonalspaceTemplate_GEN3` je public, má GitHub template flag a
   jeho `main` prošel `bun run check`.
-- Veřejný Lazurio root `HumanAndMachines/Lazurio` je naklonovaný v
-  `~/Conglomerate`
-  a obsahuje mountpoint `personalspace/`.
+- Nad mountpointem `personalspace/` je Lazurio: buď veřejný Lazurio root
+  `HumanAndMachines/Lazurio` naklonovaný v `~/Conglomerate`, nebo Lazurio
+  Folder, který zakládá Lazurio Platform (viz „Automaticky z Lazurio
+  Platform" níže).
 - GitHub CLI je přihlášené pod účtem budoucího vlastníka Personalspace.
 
 Pokud některý gate chybí, repo zatím negeneruj. Rootový příkaz tyto podmínky
 ověřuje fail-closed před jakýmkoli zápisem.
+
+### Co bootstrap kontroluje nad `personalspace/`
+
+Bootstrap i doctor poznají rodiče mountu podle souboru, nikdy podle jména
+adresáře:
+
+| Nad `personalspace/` | Poznávací soubor | Kořenové Git kontroly (mount ignorovaný, žádné gitlinky) |
+| --- | --- | --- |
+| Lazurio root checkout | `launchpad.gen3.json` | vždy; bez Gitu bootstrap skončí chybou |
+| Lazurio Folder Platformy | `.lazurio/preferences.json` | jen když Folder leží v nějakém Git repozitáři; jinak nemá mount kam uniknout |
+| nic z toho | — | bootstrap odmítne pokračovat |
+
+Folder má přednost před `launchpad.gen3.json`: Folder předaný hostingem smí
+nést legacy `launchpad.gen3.json`, ale Git checkout rootu to není. Doctor
+v takovém Folderu hlásí kořenové kontroly jako `not_applicable` /
+`no_such_mount`. Všechny kontroly samotného Personalspace (origin, private
+repo, gitignore, gitlinky, trackovaný obsah, gbrain) běží všude stejně.
+
+## Automaticky z Lazurio Platform
+
+`lazurio personalspace install` (i Nastavení → Obsah Environmentu
+v Launchpadu) dělá kroky 2–7 tohoto manuálu za vlastníka, jen když
+`<login>/<login>_GEN3` na GitHubu ještě neexistuje a Platform ho právě
+založila:
+
+1. vygeneruje private `<login>/<login>_GEN3` z tohoto template;
+2. naklonuje ho do `<Lazurio-Folder>/personalspace/<login>_GEN3`;
+3. ověří, že je checkout čistý a nese marker `personalspace.template.json`,
+   a spustí v něm tentýž bootstrap:
+   `bun run bootstrap -- --login <login> --display-name "<jméno>" --apply`
+   (jméno z GitHub profilu, jinak login). Bez `--install-gbrain`: instalace
+   gbrain CLI zůstává volbou vlastníka, a doctor proto skončí `incomplete`
+   jen kvůli vědomě odloženému `gbrain.cli`;
+4. commitne a pushne `personal.gen3.json` a `modules.manifest.json` do
+   `main` nového repa a `.gitignore` do `main` gbrain repa (krok 7). Repo
+   vzniklo v tomtéž běhu, takže jde o dokončení založení, ne o přepis cizí
+   práce.
+
+Když bootstrap selže, Platform nic necommitne ani nepushne, nic nemaže a
+nahlásí důvod a další krok: opravit příčinu a v checkoutu spustit bootstrap
+znovu (založené gbrain repo i jeho klon přijme), pak publikovat podle kroku 7.
+
+## Existující Personalspace s placeholdery
+
+Personalspace založený dřív bez bootstrapu nese placeholdery
+`owner-github-username` a `Owner Display Name`. Jeho `main` je Publikace
+vlastníka, proto ho Lazurio Platform nepřepisuje: `lazurio personalspace
+install` jen nahlásí stav a další krok. Bootstrap umí běžet z task worktree
+a změnu pak vlastník přijme pull requestem:
+
+```text
+git -C personalspace/<login>_GEN3 worktree add -b agent/name-owner ../.worktrees/name-owner
+cd personalspace/.worktrees/name-owner
+bun run bootstrap -- --login <login> --display-name "<jméno>" --apply
+git add personal.gen3.json modules.manifest.json
+git commit -m "Nastav Personalspace GEN3"
+git push -u origin HEAD
+gh pr create --fill
+```
+
+Z task worktree bootstrap zapisuje jen do worktree. Mount, `gbrain/`
+i osobní moduly čte a zakládá v primárním checkoutu, kde Personalspace
+opravdu leží; primární checkout a jeho `main` zůstanou netknuté. Nově
+založený `gbrain/.gitignore` publikuj zvlášť podle kroku 7.
 
 ## 1. Ověř účet vlastníka
 

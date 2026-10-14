@@ -10,10 +10,13 @@ import {
   appendMissingLines,
   buildModulesManifest,
   buildPersonalConfig,
+  classifyMountParent,
   expectedIdentity,
+  gitWorkTreeOf,
   gitlinkPaths,
   inferMountLayout,
   parseGitHubRemote,
+  primaryCheckoutOf,
   reposEqual,
   trackedRepoPrivacyIssues,
   validatePersonalState,
@@ -145,7 +148,8 @@ function requireValue(argv, index, option) {
 
 function usage() {
   console.log(`Použití:
-  bun run bootstrap -- --display-name "<jméno>" [--owner-type human|ai-colleague]
+  bun run bootstrap -- --display-name "<jméno>" [--login <login>]
+      [--owner-type human|ai-colleague]
       [--gbrain-repo <login>/<repo>]
       [--install-gbrain]
       [--apply]
@@ -205,6 +209,31 @@ function assertNoGitlinks(cwd) {
   if (gitlinks.length > 0) throw new Error(`Zakázané gitlinky: ${gitlinks.join(", ")}`);
 }
 
+/**
+ * Co je nad mountpointem `personalspace/` a které kořenové kontroly tam mají
+ * smysl. Lazurio root checkout: všechny, vždy (bez Gitu bootstrap skončí).
+ * Lazurio Folder Platformy: Folder není Git checkout rootu, takže mount nemá
+ * kam uniknout a Git kontroly kořene se přeskočí; leží-li Folder přesto
+ * uvnitř nějakého Git repozitáře, běží proti němu stejně jako v rootu.
+ */
+function describeMountParent(parentRoot) {
+  const kind = classifyMountParent(parentRoot);
+  if (kind === null) {
+    throw new Error(
+      "Nad personalspace/ není Lazurio root (launchpad.gen3.json) ani Lazurio Folder (.lazurio/preferences.json); "
+      + "checkout není namountovaný v Lazuriu.",
+    );
+  }
+  if (kind === "root") return { kind, git: true, label: "Lazurio root (launchpad.gen3.json)" };
+  const tree = gitWorkTreeOf(parentRoot, { runCommand });
+  if (tree === "unknown") {
+    throw new Error(`Nejde ověřit, jestli Lazurio Folder ${parentRoot} leží v Git repozitáři; je dostupné git?`);
+  }
+  return tree === "inside"
+    ? { kind, git: true, label: "Lazurio Folder uvnitř Git repozitáře (kořenové Git kontroly běží)" }
+    : { kind, git: false, label: "Lazurio Folder mimo Git (kořenový repozitář tu není, Git kontroly kořene nemají co hlídat)" };
+}
+
 function assertIgnored(cwd, path) {
   const result = runCommand("git", ["check-ignore", "--quiet", "--no-index", path], {
     cwd,
@@ -242,21 +271,22 @@ export async function bootstrapPersonalspace(options, {
     options,
   });
   const identity = expectedIdentity(login, bindings.gbrainRepo);
-  const layout = inferMountLayout(personalspaceRoot, login);
-  if (!existsSync(join(layout.conglomerateRoot, "launchpad.gen3.json"))) {
-    throw new Error("Nad personalspace/ chybí launchpad.gen3.json; checkout není v Lazurio rootu.");
-  }
+  // Z task worktree se zapisuje do worktree; mount, gbrain/ a rodič se čtou
+  // z primárního checkoutu, ve kterém Personalspace opravdu leží.
+  const primaryRoot = primaryCheckoutOf(personalspaceRoot, { runCommand });
+  const layout = inferMountLayout(primaryRoot, login);
+  const parent = describeMountParent(layout.conglomerateRoot);
   const ownerRemote = originRemote(personalspaceRoot);
   if (!reposEqual(parseGitHubRemote(ownerRemote), identity.repo)) {
     throw new Error(`Origin musí ukazovat na ${identity.repo}.`);
   }
   assertPrivate(repoInfo(identity.repo, personalspaceRoot), identity.repo);
-  assertIgnored(layout.conglomerateRoot, identity.mountPath);
+  if (parent.git) assertIgnored(layout.conglomerateRoot, identity.mountPath);
   assertIgnored(personalspaceRoot, "secrets/provider/scope/purpose/credential.txt");
   assertIgnored(personalspaceRoot, "gbrain/.privacy-probe");
   assertIgnored(personalspaceRoot, "buddy/.privacy-probe");
   assertIgnored(personalspaceRoot, "workspace/example-private-module");
-  assertNoGitlinks(layout.conglomerateRoot);
+  if (parent.git) assertNoGitlinks(layout.conglomerateRoot);
   assertNoGitlinks(personalspaceRoot);
   const ownerPrivacyIssues = trackedRepoPrivacyIssues(personalspaceRoot, {
     runCommand,
@@ -266,7 +296,7 @@ export async function bootstrapPersonalspace(options, {
     throw new Error(`Trackovaný privacy obsah: ${ownerPrivacyIssues.join("; ")}`);
   }
 
-  const gbrainRoot = join(personalspaceRoot, "gbrain");
+  const gbrainRoot = join(primaryRoot, "gbrain");
   let gbrainInfo = repoInfo(identity.gbrainRepo, personalspaceRoot, { allowMissing: true });
   let gbrainRemote = null;
   if (gbrainInfo) assertPrivate(gbrainInfo, identity.gbrainRepo);
@@ -303,7 +333,7 @@ export async function bootstrapPersonalspace(options, {
   });
   const manifest = buildModulesManifest(manifestTemplate, login);
   const preflightStateIssues = validatePersonalState(personal, manifest, {
-    directoryName: basename(personalspaceRoot),
+    directoryName: basename(primaryRoot),
     ownerRemote,
     gbrainRemote,
   });
@@ -314,6 +344,10 @@ export async function bootstrapPersonalspace(options, {
   console.log("Personalspace preflight PASS");
   console.log(`- GitHub owner repo: ${identity.repo} (private)`);
   console.log(`- Lokální mount: ${identity.mountPath}`);
+  console.log(`- Nad personalspace/: ${parent.label}`);
+  if (primaryRoot !== personalspaceRoot) {
+    console.log(`- Task worktree: zapisuje se sem, gbrain/ žije v ${relative(personalspaceRoot, gbrainRoot)}`);
+  }
   console.log(`- Gbrain data repo: ${identity.gbrainRepo} (${gbrainInfo ? "private, existuje" : "bude vytvořeno jako private"})`);
   console.log(`- Gbrain software: ${GBRAIN_INSTALL_SOURCE}${options.installGbrain ? " (nainstaluje se CLI; aktivace zůstává owner gate)" : " (instalace CLI přeskočena)"}`);
   console.log("- Buddy: není součást CAC-0071; Personalspace zůstává plně validní bez Buddyho");
@@ -354,7 +388,7 @@ export async function bootstrapPersonalspace(options, {
   await ensureGbrainIgnore(gbrainRoot);
 
   const stateIssues = validatePersonalState(personal, manifest, {
-    directoryName: basename(personalspaceRoot),
+    directoryName: basename(primaryRoot),
     ownerRemote,
     gbrainRemote,
   });
@@ -413,7 +447,9 @@ export async function bootstrapPersonalspace(options, {
   console.log("  git status --short");
   console.log("  git add personal.gen3.json modules.manifest.json");
   console.log('  git commit -m "Nastav Personalspace GEN3"');
-  console.log("  git push");
+  console.log(primaryRoot === personalspaceRoot
+    ? "  git push"
+    : "  git push -u origin HEAD   # a otevři pull request do main svého Personalspace");
   console.log("\nGbrain data repo má vlastní necommitnutý .gitignore; zkontroluj a publikuj jej zvlášť.");
   console.log(`  git -C ${relative(personalspaceRoot, gbrainRoot) || "gbrain"} status --short`);
   console.log("\nGbrain CLI není totéž co aktivovaný brain. Podle manual/bootstrap-personalspace.md");
