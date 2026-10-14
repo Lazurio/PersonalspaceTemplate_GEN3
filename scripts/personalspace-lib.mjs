@@ -171,6 +171,8 @@ export function gitWorkTreeOf(directory, { runCommand }) {
   const result = runCommand("git", ["rev-parse", "--is-inside-work-tree"], {
     cwd: directory,
     allowFailure: true,
+    // Odpověď „not a git repository" se čte v angličtině i pod lokalizovaným gitem.
+    env: { LC_ALL: "C" },
   });
   if (result.status === 0 && String(result.stdout).trim() === "true") return "inside";
   if (Number.isInteger(result.status) && !result.error && /not a git repository/i.test(String(result.stderr))) {
