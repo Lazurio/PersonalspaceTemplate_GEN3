@@ -12,7 +12,7 @@ import { spawnSync } from "node:child_process";
 import { chmod, cp, mkdir, mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { basename, dirname, join, posix, resolve, win32 } from "node:path";
 
 import { runPersonalspaceDoctor, SELF_CHECK_OWNER } from "./doctor-personalspace-lib.mjs";
 import {
@@ -89,14 +89,19 @@ test("Git working tree: inside, outside jen na výslovnou odpověď gitu, jinak 
 });
 
 test("primární checkout: z task worktree adresář nad společným .git, jinak cwd", () => {
-  const files = new Set(["/f/personalspace/.worktrees/naming/.git", "/f/personalspace/x_GEN3/.git/HEAD", "/f/personalspace/x_GEN3/.git"]);
-  const fileExists = (path) => files.has(path);
-  const runCommand = () => ({ status: 0, stdout: "/f/personalspace/x_GEN3/.git\n", stderr: "", error: null });
-  expect(primaryCheckoutOf("/f/personalspace/.worktrees/naming", { runCommand, fileExists })).toBe("/f/personalspace/x_GEN3");
-  expect(primaryCheckoutOf("/f/personalspace/x_GEN3", { runCommand, fileExists })).toBe("/f/personalspace/x_GEN3");
-  const failing = () => ({ status: 128, stdout: "", stderr: "fatal", error: null });
-  expect(primaryCheckoutOf("/f/personalspace/.worktrees/naming", { runCommand: failing, fileExists }))
-    .toBe("/f/personalspace/.worktrees/naming");
+  // Obě cestové sémantiky explicitně, ať test platí stejně na každém OS.
+  for (const [pathApi, root] of [[posix, "/f"], [win32, "D:\\f"]]) {
+    const at = (...parts) => pathApi.join(root, ...parts);
+    const worktree = at("personalspace", ".worktrees", "naming");
+    const primary = at("personalspace", "x_GEN3");
+    const files = new Set([pathApi.join(worktree, ".git"), pathApi.join(primary, ".git"), pathApi.join(primary, ".git", "HEAD")]);
+    const fileExists = (path) => files.has(path);
+    const runCommand = () => ({ status: 0, stdout: `${pathApi.join(primary, ".git")}\n`, stderr: "", error: null });
+    expect(primaryCheckoutOf(worktree, { runCommand, fileExists, pathApi })).toBe(primary);
+    expect(primaryCheckoutOf(primary, { runCommand, fileExists, pathApi })).toBe(primary);
+    const failing = () => ({ status: 128, stdout: "", stderr: "fatal", error: null });
+    expect(primaryCheckoutOf(worktree, { runCommand: failing, fileExists, pathApi })).toBe(worktree);
+  }
 });
 
 // ---- Doctor pod Lazurio Folderem ---------------------------------------------
@@ -148,11 +153,12 @@ async function folderPersonalspace(options = {}) {
 
 /** Stub příkazů; `folderTree` je odpověď gitu na „je Folder v repozitáři?". */
 function stub({ folder, folderTree, ignoredInFolderRepo = true }) {
+  const inFolder = (cwd) => resolve(String(cwd)) === resolve(folder);
   return (command, args = [], options = {}) => {
     const done = (stdout = "", status = 0, stderr = "") => ({ status, stdout, stderr, error: null });
     if (command === "git") {
       if (args[0] === "rev-parse" && args[1] === "--is-inside-work-tree") {
-        if (options.cwd !== folder) return done("true");
+        if (!inFolder(options.cwd)) return done("true");
         return folderTree === "inside"
           ? done("true")
           : folderTree === "outside"
@@ -160,11 +166,11 @@ function stub({ folder, folderTree, ignoredInFolderRepo = true }) {
             : { status: 1, stdout: "", stderr: "spawn git ENOENT", error: new Error("ENOENT") };
       }
       if (args[0] === "config") {
-        const repo = String(options.cwd).endsWith("/gbrain") ? `${LOGIN}-gbrain` : `${LOGIN}_GEN3`;
+        const repo = basename(String(options.cwd)) === "gbrain" ? `${LOGIN}-gbrain` : `${LOGIN}_GEN3`;
         return done(`git@github.com:${LOGIN}/${repo}.git`);
       }
       if (args[0] === "check-ignore") {
-        if (options.cwd === folder) return ignoredInFolderRepo ? done() : done("", 1);
+        if (inFolder(options.cwd)) return ignoredInFolderRepo ? done() : done("", 1);
         return done();
       }
       return done();
