@@ -62,6 +62,11 @@ i Windows PowerShellu:
 bun run personalspace:create -- --display-name "<jméno>" --apply --install-gbrain
 ```
 
+Na Lazurio Environmentu stačí `lazurio personalspace install` (nebo Nastavení
+→ Obsah Environmentu v Launchpadu): Lazurio Platform repo z template založí,
+naklonuje do Lazurio Folderu a spustí tentýž bootstrap níže (bez
+`--install-gbrain`, instalace gbrain CLI zůstává volbou vlastníka).
+
 Pokud už repo z template existuje a je naklonované ve správném mountu, spusť
 uvnitř něj:
 

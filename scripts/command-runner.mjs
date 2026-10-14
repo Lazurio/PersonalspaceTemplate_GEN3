@@ -9,9 +9,12 @@ export function runCommand(command, args = [], {
   cwd = process.cwd(),
   allowFailure = false,
   inherit = false,
+  env = null,
 } = {}) {
   const result = spawnSync(command, args, {
     cwd,
+    // Doplněk k prostředí procesu (např. LC_ALL=C pro čitelnou odpověď gitu).
+    env: env ? { ...process.env, ...env } : undefined,
     shell: false,
     encoding: "utf8",
     stdio: inherit ? "inherit" : ["ignore", "pipe", "pipe"],

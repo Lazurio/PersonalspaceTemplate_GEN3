@@ -1,3 +1,4 @@
+import { existsSync } from "fs";
 import path from "path";
 
 export const OWNER_PLACEHOLDER = "owner-github-username";
@@ -144,6 +145,74 @@ export function inferMountLayout(cwd, login, pathApi = path) {
     conglomerateRoot: pathApi.dirname(pathApi.dirname(absolute)),
     relativeMount: identity.mountPath,
   };
+}
+
+/** Kořenový manifest Lazurio root checkoutu (`HumanAndMachines/Lazurio`). */
+export const LAZURIO_ROOT_MANIFEST = "launchpad.gen3.json";
+/**
+ * Stav Lazurio Folderu, který zakládá Lazurio Platform (`lazurio personalspace
+ * install` na Remote Environmentu i na vlastním počítači). Folder nese
+ * `.lazurio/`, `AGENTS.md` a `manual/`, ale není to Git checkout rootu.
+ */
+export const LAZURIO_FOLDER_STATE = Object.freeze([".lazurio", "preferences.json"]);
+
+/**
+ * Co stojí nad mountpointem `personalspace/`: `folder` (Lazurio Folder
+ * Platformy), `root` (Lazurio root checkout) nebo `null` (nic z Lazuria).
+ *
+ * Rozhoduje přítomnost souboru, nikdy jméno adresáře. Folder má přednost:
+ * Folder předaný hostingem smí nést legacy `launchpad.gen3.json`, ale Git
+ * checkout rootu to není. Kořenové Git kontroly se tím neztrácejí — běží
+ * všude, kde je nad mountem Git repozitář (`gitWorkTreeOf`).
+ */
+export function classifyMountParent(parent, { fileExists = existsSync, pathApi = path } = {}) {
+  if (fileExists(pathApi.join(parent, ...LAZURIO_FOLDER_STATE))) return "folder";
+  if (fileExists(pathApi.join(parent, LAZURIO_ROOT_MANIFEST))) return "root";
+  return null;
+}
+
+/**
+ * Je `directory` uvnitř Git working tree? `inside`, `outside` (Git odpověděl,
+ * že tu repozitář není) nebo `unknown` (Git neodpověděl vůbec). Rozdíl mezi
+ * `outside` a `unknown` drží hranici „není co hlídat" vs „nešlo pozorovat".
+ */
+export function gitWorkTreeOf(directory, { runCommand }) {
+  const result = runCommand("git", ["rev-parse", "--is-inside-work-tree"], {
+    cwd: directory,
+    allowFailure: true,
+    // Odpověď „not a git repository" se čte v angličtině i pod lokalizovaným gitem.
+    env: { LC_ALL: "C" },
+  });
+  if (result.status === 0 && String(result.stdout).trim() === "true") return "inside";
+  if (Number.isInteger(result.status) && !result.error && /not a git repository/i.test(String(result.stderr))) {
+    return "outside";
+  }
+  return "unknown";
+}
+
+/**
+ * Primární checkout Personalspace, ve kterém žijí jeho nested repozitáře
+ * (`gbrain/`, `buddy/`, `workspace/*`). Z task worktree (`.git` je soubor) je
+ * to adresář nad společným `.git`; jinak `cwd` sám.
+ */
+export function primaryCheckoutOf(cwd, {
+  runCommand,
+  fileExists = existsSync,
+  pathApi = path,
+}) {
+  const dotGit = pathApi.join(cwd, ".git");
+  try {
+    if (!fileExists(dotGit) || fileExists(pathApi.join(dotGit, "HEAD"))) return cwd;
+    const result = runCommand("git", ["rev-parse", "--path-format=absolute", "--git-common-dir"], {
+      cwd,
+      allowFailure: true,
+    });
+    const common = String(result.stdout ?? "").trim();
+    if (result.status === 0 && pathApi.basename(common) === ".git") return pathApi.dirname(common);
+  } catch {
+    // Neznámý Git layout nesmí vypnout validaci; platí cwd.
+  }
+  return cwd;
 }
 
 export function buildPersonalConfig(template, {
