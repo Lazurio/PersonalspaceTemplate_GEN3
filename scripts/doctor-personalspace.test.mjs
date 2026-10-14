@@ -520,3 +520,45 @@ test("bootstrap odmítne běh, ze kterého žádný report nevznikl", () => {
   expect(outcome.accepted).toBe(false);
   expect(outcome.reason).toContain("report");
 });
+
+test("osobní modul tak, jak ho deklaruje lazurio module create: slot s repem a pool projdou privacy i materializací", async () => {
+  const { cwd } = await fixture();
+  await writeFile(join(cwd, "modules.manifest.json"), JSON.stringify({
+    ...modulesManifest,
+    module_port_pool: { start: 23000, end: 23099 },
+    module_slots: [{
+      path: "workspace/notes",
+      slug: "notes",
+      space: "workspace",
+      category: "application",
+      default_access: "private",
+      required_roles: ["owner"],
+      source_of_truth: "git-native",
+      status: "active",
+      notes: "Notes: osobní Modul založený příkazem lazurio module create (stack vite-react).",
+      git: { url: `git@github.com:${LOGIN}/notes.git`, branch: "main" },
+    }],
+  }, null, 2));
+  await mkdir(join(cwd, "workspace", "notes", ".git"), { recursive: true });
+  const result = await runPersonalspaceDoctor({
+    cwd,
+    commandRunner: stubWithModules({ "workspace/notes": { visibility: "PRIVATE" } }),
+  });
+  expect(byId(result, "modules.repo_private").status).toBe("ok");
+  expect(byId(result, "personalspace.profile_materialization").status).toBe("ok");
+  expect(result.checks.some((check) => check.id === "modules.repo_observability")).toBe(false);
+});
+
+test("pool osobních modulů mimo vyhrazený rozsah je vada materializace", async () => {
+  const { cwd } = await fixture();
+  await writeFile(join(cwd, "modules.manifest.json"), JSON.stringify({
+    ...modulesManifest,
+    module_port_pool: { start: 24000, end: 24099 },
+  }, null, 2));
+  const result = await runPersonalspaceDoctor({ cwd, commandRunner: stubRunCommand() });
+  const materialization = byId(result, "personalspace.profile_materialization");
+  expect(materialization.status).toBe("fail");
+  expect(materialization.details).toContain(
+    "modules.manifest.json module_port_pool musí být {\"start\", \"end\"} uvnitř vyhrazeného rozsahu 23000-23099",
+  );
+});

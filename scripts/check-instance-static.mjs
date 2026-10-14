@@ -16,6 +16,7 @@ import {
   expectedIdentity,
   gitlinkPaths,
   isValidGitHubLogin,
+  modulePortPoolIssues,
   reposEqual,
   trackedPathPrivacyIssues,
   trackedTextPrivacyIssues,
@@ -71,6 +72,7 @@ expect(personal.privacy?.shared_outputs === "metadata-only", "privacy.shared_out
 expect(Array.isArray(personal.shared_spaces) && personal.shared_spaces.length === 0, "shared_spaces musí zůstat prázdné");
 expect(personal.secrets?.path === "secrets" && personal.secrets?.git === "ignored", "secrets custody musí zůstat gitignored");
 for (const issue of doctorDeclarationIssues(personal)) failures.push(issue);
+for (const issue of modulePortPoolIssues(modules)) failures.push(issue);
 
 if (personal.buddy !== undefined) {
   expect(personal.buddy?.repository?.visibility === "private", "Buddy profile repo declaration musí být private");

@@ -1,6 +1,10 @@
 {
   "personal_generation": "gen3",
   "owner": "owner-github-username",
+  "module_port_pool": {
+    "start": 23000,
+    "end": 23099
+  },
   "module_slots": [
     {
       "path": "workspace/personal-notes",
