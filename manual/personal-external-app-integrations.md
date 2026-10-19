@@ -1,7 +1,7 @@
 # Osobní napojení na externí aplikace (MCP/CLI)
 
 Personalspace scope GEN3 standardu napojování na externí aplikace: osobní
-Gmail, kalendář, úložiště a další služby Principála se připojují **primárně
+Gmail, kalendář, úložiště a další služby vlastníka se připojují **primárně
 lokálně definovaným MCP serverem nebo CLI nástrojem na dané mašině**. Nové
 napojení se nikdy nezřizuje přes ChatGPT/claude.ai konektor ani sdílený
 cloudový broker; už nainstalovaný konektor se používat smí a nový agent sám
@@ -12,7 +12,7 @@ manuál drží jen to, co je v osobním scope jinak.
 ## Proč lokálně
 
 Identita a subscription harnessu (ChatGPT/Claude účet) se smí sdílet napříč
-mašinami Principála. Přístupy k externím aplikacím ne: cloudový konektor by
+mašinami vlastníka. Přístupy k externím aplikacím ne: cloudový konektor by
 osobní přihlášení roznesl na všechny mašiny včetně pracovních. Každá mašina
 drží vlastní OAuth granty a je samostatně revokovatelný přístup.
 
@@ -39,9 +39,10 @@ drží vlastní OAuth granty a je samostatně revokovatelný přístup.
 5. **Izolace vůči Organizacím platí oběma směry.** Osobní data nepatří do
    org workflow a org data se nečtou osobními přihlášeními. Když úkol
    potřebuje org službu, řeš to v katalogu té Organizace, ne tady.
-6. **Buddy** používá osobní integrace pod účty a mandáty svého Principála;
-   custody tokenů zůstává v tomto Personalspace (nebo na dedikovaném VPS
-   Buddyho), nikdy ve sdílené infrastruktuře ani u třetí strany.
+6. **Buddy** používá osobní integrace pod účty a mandáty svého člověka;
+   custody tokenů zůstává v tomto Personalspace a v Osobním Prostředí, ve
+   kterém Buddy běží (Lazurio decision 0210), nikdy ve sdílené infrastruktuře
+   ani u třetí strany.
 
 ## Onboarding nové osobní integrace
 
@@ -55,7 +56,7 @@ drží vlastní OAuth granty a je samostatně revokovatelný přístup.
    jsou defaultně read i write. Artefakt po ověření ukliď. Write agenta je
    vždy Draft: co vytvoří, musí být vratné a editovatelné, a nevratnou
    publikaci (odeslání, zveřejnění, mazání, přepis ostrého obsahu) dělá
-   Principál nebo agent jen na jeho explicitní pokyn.
+   vlastník nebo agent jen na jeho explicitní pokyn.
 5. Při vyřazení: odhlásit v harnessu, revokovat grant u poskytovatele,
    smazat lokální cache. Closeout metadata-only.
 
@@ -83,7 +84,7 @@ Prakticky z toho plyne:
 ## Zpětná vazba je povinná
 
 Standard a runbooky jsou živý komunitní majetek HumanAndMachine — nikdo je
-denně nepřetestovává. Když se Principál při instalaci zasekne nebo runbook
+denně nepřetestovává. Když se vlastník při instalaci zasekne nebo runbook
 neodpovídá realitě poskytovatele, agent pošle opravný PR na
 [`HumanAndMachines/Lazurio`](https://github.com/HumanAndMachines/Lazurio)
 (bez známého řešení aspoň issue).

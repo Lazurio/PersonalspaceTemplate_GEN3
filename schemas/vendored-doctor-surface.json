@@ -1,6 +1,6 @@
 {
   "schema_version": "humanandmachines.vendored-doctor-surface.v1",
-  "why": "Personalspace doctor musí běžet SAMOSTATNĚ. Na Buddy VPS je v <login>_GEN3 Personalspace a nad ním už žádný Lazurio root, ze kterého by šlo společný surface naimportovat. Proto je tu byte-identický self-contained compatibility snapshot, ne runtime import.",
+  "why": "Personalspace doctor musí běžet SAMOSTATNĚ. V Lazurio Folderu ani v samostatném checkoutu není nad <login>_GEN3 Lazurio root, ze kterého by šlo společný surface naimportovat. Proto je tu byte-identický self-contained compatibility snapshot, ne runtime import.",
   "source": {
     "distribution": "embedded-compatibility-snapshot",
     "decision": "0118",

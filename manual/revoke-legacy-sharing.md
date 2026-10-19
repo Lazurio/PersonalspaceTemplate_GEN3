@@ -2,7 +2,7 @@
 
 Tento jednorázový postup použij u Personalspace, který mohl podle starého
 runbooku získat GitHub collaboratora. Od decision 0091 je Personalspace
-výhradní intimní prostor jednoho Principála a jeho volitelného Buddyho. Prázdné
+výhradní intimní prostor jednoho člověka (vlastníka) a jeho Buddyho. Prázdné
 `shared_spaces` není důkazem, že na GitHubu nezůstal starý grant.
 
 ## 1. Udělej read-only inventář
@@ -14,11 +14,11 @@ gh api --paginate repos/<owner>/<repo>/collaborators --jq '.[].login'
 gh api --paginate repos/<owner>/<repo>/invitations --jq '.[] | [.id, .invitee.login] | @tsv'
 ```
 
-První výsledek smí obsahovat pouze GitHub login Principála, druhý musí být
+První výsledek smí obsahovat pouze GitHub login vlastníka, druhý musí být
 prázdný. Starý grant může zůstat jako čekající pozvánka a po pozdějším přijetí
-by znovu otevřel přístup. Buddy jedná pod účty a credentials Principála; nemá
+by znovu otevřel přístup. Buddy jedná pod účty a credentials vlastníka; nemá
 vlastní collaborator grant. GitHub Apps a jejich installation scope ověř
-odděleně v nastavení osobního GitHub účtu, pokud je Principál někdy instaloval.
+odděleně v nastavení osobního GitHub účtu, pokud je vlastník někdy instaloval.
 
 ## 2. Odeber každý cizí grant
 
@@ -29,7 +29,7 @@ gh api -X DELETE repos/<owner>/<repo>/collaborators/<former-collaborator>
 gh api -X DELETE repos/<owner>/<repo>/invitations/<invitation-id>
 ```
 
-Jde o externí access změnu. Příkaz smí Principál provést až po kontrole přesného
+Jde o externí access změnu. Příkaz smí vlastník provést až po kontrole přesného
 repa a loginu; Task Agent ho nesmí spustit bez jeho explicitního pokynu v
 daném tasku.
 
