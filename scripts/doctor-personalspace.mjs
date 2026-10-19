@@ -4,9 +4,10 @@
 // adresář, s `--json` vrací v3 report na stdout a končí exit kódem
 //   0 = ok|warn · 1 = fail · 2 = incomplete (aspoň jeden blocked) · 3 = report nevznikl.
 //
-// Běží samostatně. Na Buddy VPS nad ním žádný Lazurio root není a nikdy
-// nebude; kontroly kořene se proto hlásí jako not_applicable / owned_by_root, ne
-// jako vada instalace, která se nikdy nestala.
+// Běží samostatně. V Lazurio Folderu ani v samostatném checkoutu nad ním Git
+// checkout Lazurio rootu není; kontroly kořene se proto hlásí jako not_applicable
+// (owned_by_root, pod Folderem no_such_mount), ne jako vada instalace, která se
+// nikdy nestala.
 
 import { DOCTOR_EXIT_CODES, exitCodeForSummaryStatus } from "./doctor-surface-lib.mjs";
 import { renderHumanReport, runPersonalspaceDoctor } from "./doctor-personalspace-lib.mjs";

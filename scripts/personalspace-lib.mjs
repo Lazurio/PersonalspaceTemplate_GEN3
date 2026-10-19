@@ -28,6 +28,17 @@ export const DOCTOR_COMMAND = Object.freeze(["bun", "scripts/doctor-personalspac
  * se slotem prvního modulu.
  */
 export const PERSONAL_MODULE_PORT_POOL = Object.freeze({ start: 23000, end: 23099 });
+/**
+ * Buddy v Osobním Prostředí (Lazurio decision 0210). Buddy je nabrífovaný
+ * Hermes Agent z forku `Lazurio/hermes-agent`, který běží uvnitř Osobního
+ * Prostředí svého člověka jako jeho součást, ne na vlastní Mašině. Personalspace
+ * o něm drží jen deklaraci a secret-free profil v `buddy/` (Hermes profile
+ * distribution upstreamu). Samostatný hostovaný Buddy na dedikované VPS
+ * a Resident distribuce Buddyho skončily.
+ */
+export const BUDDY_DEPLOYMENT_TARGET = "owner-personal-environment";
+export const BUDDY_HERMES_SOFTWARE_REPO = "Lazurio/hermes-agent";
+export const BUDDY_PROFILE_FORMAT = "hermes-profile-distribution";
 
 const githubLoginPattern = /^[A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?$/;
 const repoNamePattern = /^[A-Za-z0-9_.-]+$/;
@@ -310,7 +321,6 @@ export function validatePersonalState(config, manifest, {
   directoryName = null,
   ownerRemote = null,
   gbrainRemote = null,
-  buddyMode = "reject",
 } = {}) {
   const failures = [];
   if (config?.schema_version !== PERSONAL_SCHEMA_VERSION) {
@@ -360,13 +370,7 @@ export function validatePersonalState(config, manifest, {
   if (ownerRemote && !reposEqual(parseGitHubRemote(ownerRemote), identity.repo)) {
     failures.push(`origin remote musí ukazovat na ${identity.repo}`);
   }
-  if (config.buddy !== undefined && buddyMode !== "hosted") {
-    failures.push(
-      "CAC-0071 validátor necertifikuje Buddy-enabled Personalspace; použij oddělený CAC-0072 hosted validátor a runtime/privacy gate",
-    );
-  } else if (config.buddy !== undefined) {
-    failures.push(...hostedBuddyStateIssues(config.buddy, login));
-  }
+  if (config.buddy !== undefined) failures.push(...buddyStateIssues(config.buddy, login));
   if (config.gbrain?.path !== "gbrain") failures.push("gbrain.path musí být gbrain");
   if (String(config.gbrain?.repository?.visibility).toLowerCase() !== "private") {
     failures.push("gbrain.repository.visibility musí být private");
@@ -412,7 +416,7 @@ export function validatePersonalState(config, manifest, {
   if (!Array.isArray(config.shared_spaces)) {
     failures.push("shared_spaces musí být pole");
   } else if (config.shared_spaces.length !== 0) {
-    failures.push("shared_spaces musí zůstat prázdné; Personalspace je jen pro Principála a jeho Buddyho");
+    failures.push("shared_spaces musí zůstat prázdné; Personalspace je jen pro vlastníka a jeho Buddyho");
   }
   if (manifest?.owner !== login) failures.push("modules.manifest.json owner musí odpovídat GitHub loginu");
   if (manifest?.personal_generation !== "gen3") {
@@ -432,31 +436,57 @@ export function validatePersonalState(config, manifest, {
   return failures;
 }
 
-function hostedBuddyStateIssues(buddy, login) {
+/**
+ * Blok `buddy` podle Lazurio decision 0210. Deklaruje, že Buddy běží v Osobním
+ * Prostředí vlastníka (`runtime.deployment_target`), že jeho software je Hermes
+ * Agent z forku `Lazurio/hermes-agent` a že jeho secret-free profil leží
+ * v private repu vlastníka namountovaném v `buddy/`.
+ *
+ * Pole skončeného modelu se odmítají, ne tiše přecházejí: deklarace, která by
+ * dál tvrdila Buddyho na dedikované VPS, zákaz lokálního běhu nebo runtime
+ * z Resident distribuce, by o Personalspace říkala něco, co už neplatí.
+ */
+export function buddyStateIssues(buddy, login) {
+  if (!buddy || typeof buddy !== "object" || Array.isArray(buddy)) return ["buddy musí být objekt"];
   const failures = [];
-  if (typeof buddy?.slug !== "string" || buddy.slug.trim() === "") failures.push("buddy.slug musí být neprázdný");
-  if (buddy?.gbrain_path !== "gbrain") failures.push("buddy.gbrain_path musí být gbrain");
-  if (buddy?.path !== "buddy") failures.push("buddy.path musí být buddy");
-  const profileRepo = normalizeRepoSlug(buddy?.repository?.github_repo);
+  if (typeof buddy.slug !== "string" || buddy.slug.trim() === "") failures.push("buddy.slug musí být neprázdný");
+  if (buddy.gbrain_path !== "gbrain") failures.push("buddy.gbrain_path musí být gbrain");
+  if (buddy.path !== "buddy") failures.push("buddy.path musí být buddy");
+  const profileRepo = normalizeRepoSlug(buddy.repository?.github_repo);
   if (!profileRepo) {
     failures.push("buddy.repository.github_repo musí být explicitní owner/repo");
-  } else if (profileRepo.split("/")[0].toLowerCase() !== login.toLowerCase()) {
+  } else if (profileRepo.split("/")[0].toLowerCase() !== String(login).toLowerCase()) {
     failures.push("Buddy profile repo musí patřit vlastníkovi Personalspace");
   }
-  if (buddy?.repository?.visibility !== "private") failures.push("Buddy profile repo musí být private");
-  if (buddy?.repository?.mount_strategy !== NESTED_REPO_STRATEGY) {
+  if (buddy.repository?.visibility !== "private") failures.push("Buddy profile repo musí být private");
+  if (buddy.repository?.mount_strategy !== NESTED_REPO_STRATEGY) {
     failures.push(`Buddy profile repo musí používat ${NESTED_REPO_STRATEGY}`);
   }
-  if (!normalizeRepoSlug(buddy?.runtime?.github_repo)) failures.push("Buddy runtime github_repo musí být explicitní owner/repo");
-  if (buddy?.runtime?.deployment_target !== "owner-dedicated-personalspace-vps") {
-    failures.push("Buddy runtime musí běžet na owner-dedicated-personalspace-vps");
+  if (buddy.runtime?.deployment_target !== BUDDY_DEPLOYMENT_TARGET) {
+    failures.push(
+      `buddy.runtime.deployment_target musí být ${BUDDY_DEPLOYMENT_TARGET}: `
+      + "Buddy běží v Osobním Prostředí vlastníka (Lazurio decision 0210)",
+    );
   }
-  if (buddy?.runtime?.local_execution !== "forbidden") failures.push("Buddy runtime local_execution musí být forbidden");
-  if (!normalizeRepoSlug(buddy?.hermes?.software_repo)) failures.push("buddy.hermes.software_repo musí být explicitní owner/repo");
-  if (buddy?.hermes?.profile_format !== "hermes-profile-distribution") {
-    failures.push("buddy.hermes.profile_format musí být hermes-profile-distribution");
+  if (buddy.runtime?.local_execution !== undefined) {
+    failures.push(
+      "buddy.runtime.local_execution skončilo s Lazurio decision 0210 (Buddy běží v Osobním Prostředí "
+      + "z Lazurio Folderu); pole odstraň",
+    );
   }
-  if (buddy?.hermes?.profile_path !== "buddy") failures.push("buddy.hermes.profile_path musí být buddy");
+  if (buddy.runtime?.github_repo !== undefined) {
+    failures.push(
+      "buddy.runtime.github_repo skončilo s Lazurio decision 0210 (Resident distribuce Buddyho skončila; "
+      + "software Buddyho deklaruje buddy.hermes.software_repo); pole odstraň",
+    );
+  }
+  if (buddy.hermes?.software_repo !== BUDDY_HERMES_SOFTWARE_REPO) {
+    failures.push(`buddy.hermes.software_repo musí být fork ${BUDDY_HERMES_SOFTWARE_REPO} (Lazurio decision 0210)`);
+  }
+  if (buddy.hermes?.profile_format !== BUDDY_PROFILE_FORMAT) {
+    failures.push(`buddy.hermes.profile_format musí být ${BUDDY_PROFILE_FORMAT}`);
+  }
+  if (buddy.hermes?.profile_path !== "buddy") failures.push("buddy.hermes.profile_path musí být buddy");
   return failures;
 }
 

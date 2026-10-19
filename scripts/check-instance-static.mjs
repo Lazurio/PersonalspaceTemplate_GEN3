@@ -12,6 +12,7 @@ import {
   PERSONAL_SCHEMA_VERSION,
   PERSONALSPACE_TEMPLATE_REPO,
   PERSONALSPACE_TEMPLATE_VERSION,
+  buddyStateIssues,
   doctorDeclarationIssues,
   expectedIdentity,
   gitlinkPaths,
@@ -74,14 +75,10 @@ expect(personal.secrets?.path === "secrets" && personal.secrets?.git === "ignore
 for (const issue of doctorDeclarationIssues(personal)) failures.push(issue);
 for (const issue of modulePortPoolIssues(modules)) failures.push(issue);
 
+// Buddy v Osobním Prostředí (Lazurio decision 0210): stejný kontrakt bloku
+// `buddy`, jaký ověřuje doctor, jen bez živého GitHubu.
 if (personal.buddy !== undefined) {
-  expect(personal.buddy?.repository?.visibility === "private", "Buddy profile repo declaration musí být private");
-  expect(personal.buddy?.repository?.mount_strategy === NESTED_REPO_STRATEGY, "Buddy profile musí být Doctor-managed nested repo");
-  expect(personal.buddy?.runtime?.local_execution === "forbidden", "Buddy runtime nesmí běžet v lokálním Personalspace");
-  expect(
-    personal.buddy?.runtime?.deployment_target === "owner-dedicated-personalspace-vps",
-    "Buddy runtime musí zůstat na owner-dedicated Personalspace VPS",
-  );
+  for (const issue of buddyStateIssues(personal.buddy, login)) failures.push(issue);
 }
 
 expect(marker.schema_version === PERSONALSPACE_TEMPLATE_VERSION, "template marker version driftuje");

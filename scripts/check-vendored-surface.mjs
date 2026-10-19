@@ -1,7 +1,8 @@
 // Brána nad vendorovaným společným surfacem doctorů (decision 0118).
 //
-// Personalspace doctor musí běžet SAMOSTATNĚ — na Buddy VPS není žádný Lazurio
-// root, ze kterého by šel surface naimportovat. Snapshot je proto nutný, ale
+// Personalspace doctor musí běžet SAMOSTATNĚ — v Lazurio Folderu ani v samostatném
+// checkoutu nad ním není Lazurio root, ze kterého by šel surface naimportovat.
+// Snapshot je proto nutný, ale
 // nesmí být tichý: kdo do něj sáhne, musí přepsat i sha256
 // v schemas/vendored-doctor-surface.json, a tím je cizí soubor upravený na místě
 // vidět v diffu. Runtime drift chytá root doctor (children[].outcome =

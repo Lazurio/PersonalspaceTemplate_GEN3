@@ -101,9 +101,9 @@ function personalManifest(overrides = {}) {
 const modulesManifest = { personal_generation: "gen3", owner: LOGIN, module_slots: [] };
 
 /**
- * Fixture má tvar Buddy VPS: `<tmp>/personalspace/<login>_GEN3` a nad ním NIC.
- * Rodičovský adresář se opravdu jmenuje `personalspace` — přesně proto nesmí
- * detekce kořene věřit jménu adresáře.
+ * Fixture má tvar samostatného checkoutu: `<tmp>/personalspace/<login>_GEN3`
+ * a nad ním NIC. Rodičovský adresář se opravdu jmenuje `personalspace` — přesně
+ * proto nesmí detekce kořene věřit jménu adresáře.
  */
 async function fixture({ withRoot = false, withGbrainMount = true, modules = [] } = {}) {
   const base = await mkdtemp(join(tmpdir(), "personalspace-doctor-"));
@@ -290,6 +290,46 @@ test("chybějící Buddy mount je fakt, ne vada", async () => {
   const check = byId(result, "buddy.mount");
   expect(check.status).toBe("not_applicable");
   expect(check.not_applicable_reason).toBe("no_such_mount");
+});
+
+test("Buddy v Osobním Prostředí projde materializací, Buddy na dedikované VPS ne (decision 0210)", async () => {
+  const buddy = {
+    slug: "vzorovy-buddy",
+    gbrain_path: "gbrain",
+    path: "buddy",
+    repository: {
+      github_repo: `${LOGIN}/${LOGIN}-buddy`,
+      visibility: "private",
+      mount_strategy: NESTED_REPO_STRATEGY,
+    },
+    runtime: { deployment_target: "owner-personal-environment" },
+    hermes: {
+      software_repo: "Lazurio/hermes-agent",
+      profile_format: "hermes-profile-distribution",
+      profile_path: "buddy",
+    },
+  };
+  const { cwd } = await fixture();
+  await writeFile(join(cwd, "personal.gen3.json"), JSON.stringify(personalManifest({ buddy }), null, 2));
+  const current = await runPersonalspaceDoctor({ cwd, commandRunner: stubRunCommand() });
+  expect(byId(current, "personalspace.profile_materialization").status).toBe("ok");
+
+  // Blok, jak platil před 0210: doctor ho nesmí dál potvrzovat jako platný.
+  await writeFile(join(cwd, "personal.gen3.json"), JSON.stringify(personalManifest({
+    buddy: {
+      ...buddy,
+      runtime: {
+        github_repo: "HumanAndMachines/Lazurio",
+        deployment_target: "owner-dedicated-personalspace-vps",
+        local_execution: "forbidden",
+      },
+    },
+  }), null, 2));
+  const retired = await runPersonalspaceDoctor({ cwd, commandRunner: stubRunCommand() });
+  const materialization = byId(retired, "personalspace.profile_materialization");
+  expect(materialization.status).toBe("fail");
+  expect(materialization.details).toHaveLength(3);
+  expect(materialization.details.every((detail) => detail.includes("decision 0210"))).toBe(true);
 });
 
 test("nečitelný root kontrakt je fail s reportem, ne mlčení", async () => {
