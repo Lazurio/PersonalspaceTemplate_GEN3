@@ -62,9 +62,13 @@ export function parseBootstrapArgs(argv) {
 export function resolveBootstrapRepositoryBindings({ login, personal, options }) {
   const sameOwner = typeof personal?.owner?.github_username === "string"
     && personal.owner.github_username.toLowerCase() === login.toLowerCase();
+  // `buildPersonalConfig` blok `buddy` zahazuje, takže by bootstrap deklaraci
+  // Buddyho tiše smazal. Buddy patří k Osobnímu Prostředí (Lazurio decision 0210),
+  // ne k tomuto bootstrapu.
   if (personal?.buddy !== undefined && personal?.buddy !== null) {
     throw new Error(
-      "CAC-0071 bootstrap nepřepisuje Buddy-enabled Personalspace; pokračuj podle odděleného CAC-0072 runbooku.",
+      "Bootstrap nepřepisuje Personalspace s blokem buddy: Buddy patří k Osobnímu Prostředí "
+      + "(Lazurio decision 0210) a bootstrap by jeho deklaraci smazal.",
     );
   }
   const existingGbrainRepo = sameOwner
@@ -350,7 +354,7 @@ export async function bootstrapPersonalspace(options, {
   }
   console.log(`- Gbrain data repo: ${identity.gbrainRepo} (${gbrainInfo ? "private, existuje" : "bude vytvořeno jako private"})`);
   console.log(`- Gbrain software: ${GBRAIN_INSTALL_SOURCE}${options.installGbrain ? " (nainstaluje se CLI; aktivace zůstává owner gate)" : " (instalace CLI přeskočena)"}`);
-  console.log("- Buddy: není součást CAC-0071; Personalspace zůstává plně validní bez Buddyho");
+  console.log("- Buddy: bootstrap ho nezakládá; patří k Osobnímu Prostředí (Lazurio decision 0210) a Personalspace je plně validní i bez něj");
 
   if (!options.apply) {
     console.log("Dry-run dokončen. Pro provedení přidej --apply.");

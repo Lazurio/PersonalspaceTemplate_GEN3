@@ -3,8 +3,9 @@
 // Doctor není jeden program. Root doctor v kořeni Lazuria orchestruje a nese
 // STANDARDIZOVANÉ kontroly; každé namountované repo si nese VLASTNÍ nezávislý
 // doctor, který root najde přes blok `doctor` v manifestu a zavolá. Tenhle soubor
-// je ten vlastní doctor Personalspace — a musí umět běžet i samostatně: na Buddy
-// VPS je v `<login>_GEN3` Personalspace a nad ním už nic.
+// je ten vlastní doctor Personalspace — a musí umět běžet i samostatně: v Lazurio
+// Folderu (třeba v Osobním Prostředí) nad `<login>_GEN3` Git checkout rootu není
+// a v samostatném checkoutu nad ním nemusí být nic z Lazuria.
 //
 // Slovník stavů je společný surface, ne lokální vynález:
 //   not_applicable = strukturálně mimo scope tohohle doctora (FAKT, zelenou nekazí)
@@ -49,10 +50,9 @@ export const GH_AUTH_REMEDY = "Přihlas se jako vlastník: `gh auth login` a zno
  * fork bez uvedené provenience je nedohledatelný a člověk u konzole neví, čí
  * kód si instaluje.
  *
- * Pozor na zbylý rozpor: `gbrain.software.install_source` v manifestu zatím
- * deklaruje upstream, protože ho `personal.gen3.schema.json` v
- * Lazurio schema pinuje jako `const`. Sjednocení je samostatná
- * změna Lazurio rootu; tichý fork kontraktu tady by byl horší než viditelný rozpor.
+ * Buddy v Osobním Prostředí bere gbrain z tohoto forku (Lazurio decision 0210).
+ * Výchozí `gbrain.software` šablony zatím deklaruje upstream; validátor i veřejné
+ * Lazurio schema `personal.gen3.schema.json` přijímají obě vazby.
  */
 export const GBRAIN_FORK_OF_RECORD = "Lazurio/gbrain";
 export const GBRAIN_UPSTREAM = "garrytan/gbrain";
@@ -85,10 +85,10 @@ const notApplicable = (id, severity, title, message, extra) =>
  * Je nad tímhle checkoutem Lazurio root?
  *
  * Detekce stojí na PŘÍTOMNOSTI kořenového manifestu, ne na názvu adresáře — a to
- * je celý rozdíl oproti staré fail-closed asercí. Buddy VPS má checkout v
- * `/srv/personalspace/<login>_GEN3`, takže rodičovský adresář se `personalspace`
- * opravdu jmenuje; kořen tam ale žádný není a nikdy nebude. Kdyby detekce věřila
- * jménu, doctor by na hostu hlásil chybějící `launchpad.gen3.json` jako vadu
+ * je celý rozdíl oproti staré fail-closed asercí. Samostatný checkout třeba
+ * v `/srv/personalspace/<login>_GEN3` má rodičovský adresář, který se
+ * `personalspace` opravdu jmenuje; kořen tam ale žádný není. Kdyby detekce věřila
+ * jménu, doctor by tam hlásil chybějící `launchpad.gen3.json` jako vadu
  * instalace, která se nikdy nestala.
  */
 export function detectRootContext(cwd, login, { fileExists = existsSync } = {}) {
@@ -393,9 +393,9 @@ export function collectPersonalspaceChecks({
   // (`*.origin_remote`), které umí rozlišit „ukazuje jinam" od „nešlo přečíst".
   // Kdyby je validovala i tahle agregace, jedna vada by se hlásila dvakrát.
   const materializedDirectoryName = basename(resolve(primary));
+  // Blok `buddy`, je-li deklarovaný, se ověřuje podle Lazurio decision 0210.
   const stateFailures = validatePersonalState(personal, manifest, {
     directoryName: materializedDirectoryName,
-    buddyMode: "hosted",
   });
   checks.push(stateFailures.length > 0
     ? fail("personalspace.profile_materialization", "required", "Materializace profilu", "personal.gen3.json / modules.manifest.json neodpovídá kontraktu Personalspace.", { details: stateFailures, paths: ["personal.gen3.json", "modules.manifest.json"] })
@@ -494,7 +494,7 @@ export function collectPersonalspaceChecks({
   const gbrainCli = observe(runCommand, "gbrain", ["--help"], cwd);
   checks.push(gbrainCli.ran && gbrainCli.status === 0
     ? ok("gbrain.cli", "runtime", "gbrain CLI", "gbrain CLI je dostupné; runtime zdraví ověř samostatně přes `gbrain doctor --json`.")
-    : blocked("gbrain.cli", "runtime", "gbrain CLI", "gbrain CLI není na PATH, takže o paměti Principála nevíme nic.", {
+    : blocked("gbrain.cli", "runtime", "gbrain CLI", "gbrain CLI není na PATH, takže o paměti vlastníka nevíme nic.", {
       blocked_reason: gbrainCli.stderr || "`gbrain --help` neodpověděl",
       remedy: GBRAIN_CLI_REMEDY,
     }));

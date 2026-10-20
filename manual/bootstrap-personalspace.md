@@ -1,15 +1,12 @@
 # Vytvoření Personalspace GEN3
 
-Tento kanonický owner postup vytvoří private Personalspace bez Buddyho podle
-CAC-0071. Funguje na macOS, Linuxu i ve Windows PowerShellu. Nevytváří Buddy
-repo, nepřidává blok `buddy` a nemá přepínač `--with-buddy`.
+Tento kanonický owner postup vytvoří private Personalspace bez Buddyho.
+Funguje na macOS, Linuxu i ve Windows PowerShellu. Nevytváří Buddy repo,
+nepřidává blok `buddy` a nemá přepínač `--with-buddy`.
 
-Hosted Buddy má oddělenou generační i trust hranici:
-
-- Buddy GEN2 se pro první piloty nasazuje ručně platform operátorem na
-  dedikovaný VPS podle CAC-0072 runbooku;
-- Buddy GEN3 bude budoucí deterministický `create-new` tok z Dashboardu;
-- ani jedna cesta nesmí instalovat nebo spouštět Buddyho či Hermes lokálně.
+Buddy k tomuto postupu nepatří: přichází s Osobním Prostředím (Lazurio
+decision 0210). Jak s Personalspace souvisí, popisuje sekce „Buddy v Osobním
+Prostředí“ níže.
 
 ## Než vlastník začne
 
@@ -240,9 +237,10 @@ je pořád private. Proto deklaraci vynucuje `validatePersonalState`.
 V příkladu je lidský vlastník. U AI Kolegy musí být po použití
 `--owner-type ai-colleague` hodnota `owner.type` přesně `ai-colleague`.
 
-Blok `buddy` v souboru nesmí být. Gbrain binding musí mířit na nakonfigurované
-`<gbrain-repo>` (výchozí `<login>/<login>-gbrain`) a deklarovat
-`visibility: private`.
+Blok `buddy` v souboru po bootstrapu není; Personalspace s Buddym ho dostane
+později (sekce „Buddy v Osobním Prostředí“). Gbrain binding musí mířit na
+nakonfigurované `<gbrain-repo>` (výchozí `<login>/<login>-gbrain`) a
+deklarovat `visibility: private`.
 
 ## 7. Publikuj oba private repozitáře vědomě
 
@@ -290,11 +288,11 @@ Personalspace Doctor PASS
 `gbrain.software.install_source` v manifestu. Fork-of-record, ze kterého se
 gbrain konzumuje, je `Lazurio/gbrain` — fork veřejného upstreamu
 `garrytan/gbrain`; upstream se tím nemaže, jen se jmenuje. Právě na fork-of-record
-odkazuje doctor v nápravě `BLOCKED gbrain.cli`. Deklarace v manifestu zatím drží
-upstream, protože ji veřejné Lazurio schema
+odkazuje doctor v nápravě `BLOCKED gbrain.cli` a z něj bere gbrain i Buddy
+v Osobním Prostředí (Lazurio decision 0210). Výchozí deklarace v template zatím
+drží upstream; validátor i veřejné Lazurio schema
 [`personal.gen3.schema.json`](https://github.com/HumanAndMachines/Lazurio/blob/main/lazurio/schemas/personal.gen3.schema.json)
-pinuje jako `const`; sjednotit obojí je samostatná změna Lazurio rootu.
-Aktuální postup drží
+přijímají obě vazby. Aktuální postup drží
 [`garrytan/gbrain/INSTALL_FOR_AGENTS.md`](https://github.com/garrytan/gbrain/blob/master/INSTALL_FOR_AGENTS.md).
 Provider, embedding a search režim mají privacy i nákladový dopad, proto je
 volí vlastník.
@@ -313,93 +311,80 @@ codex mcp add gbrain -- gbrain serve
 
 U prázdného brainu lze import přeskočit. Runtime cache zůstává mimo Git.
 
-## Hosted Buddy GEN2 a budoucí Buddy GEN3
+## Buddy v Osobním Prostředí
 
-Hosted část není pokračování, které by tento owner bootstrap směl spustit.
-První Buddy GEN2 piloty provádí platform operátor podle interního provozního
-runbooku; veřejný template tento privilegovaný postup nedistribuuje.
-Buddy GEN3 `create-new` bude samostatný Dashboard tok; nevzniká rozšířením
-lokálního bootstrapu o `--with-buddy`.
+Buddy není pokračování tohoto owner bootstrapu a bootstrap ho nezakládá.
+Buddy patří k Osobnímu Prostředí (Lazurio decision 0210): je to nabrífovaný
+Hermes Agent, který běží v Osobním Prostředí svého člověka jako jeho součást,
+ne na vlastní Mašině. Kdo Osobní Prostředí nemá, Buddyho nemá. Samostatný
+hostovaný Buddy na dedikované VPS, Resident distribuce Buddyho, ruční
+`CAC-0072` runbook pro Buddy hosty i chat přes Zulip skončily; nový Buddy
+tak už nevzniká.
 
-První ruční GEN2 VPS se po dokončení Dashboard lifecycle a billingu nemusí
-reinstalovat. Platform operator jej může read-only spárovat a po potvrzení
-Principálem převzít do správy interním `register-existing-host`. Tento tok
-nemění owner data, není součástí bootstrapu a není to GEN1 `adopt-existing`.
+V Osobním Prostředí platí:
 
-Buddy GEN2 i GEN3 jsou důvěryhodní osobní Agenti se stejnou agenturou nad
-zdroji, které jim Principál vědomě svěří. Rozdíl generací je v řízení životního
-cyklu: GEN2 instaluje a aktualizuje operátor ručně, GEN3 deterministicky
-Dashboard. Dashboard neslouží jako per-action permission broker. Morální
-kontrakt, červené linie a trvalé mandáty žijí v private profilu
-`<login>-buddy` jako `CONSTITUTION.md` a `MANDATES.md`.
+- Hermes Agent se instaluje z forku `Lazurio/hermes-agent` oficiální cestou
+  upstreamu, se zdrojem z forku a přesným commitem, který pinuje Machines.
+  gbrain se bere z forku `Lazurio/gbrain`.
+- Buddy je jeden a běží v Osobním Prostředí. Checkout tohoto Personalspace na
+  vlastním počítači vlastníka druhého Buddyho nespouští.
+- Buddy pracuje z Lazurio Folderu jako ostatní agenti, bez sandboxu a
+  s plnými právy Osobního Prostředí. Tahy mu zadává jen jeho člověk; obsah
+  zvenku jsou pro Buddyho data, ne pokyny.
+- Paměť je gbrain nad vaultem v `gbrain/` tohoto Personalspace a Buddy s ní
+  pracuje výhradně přes MCP (`gbrain.agent_access: mcp-only`).
+- Roli dává Buddymu `SOUL.md` z private secret-free profilu
+  `<login>/<login>-buddy` (profile distribution Hermesu), namountovaného
+  v gitignored `buddy/`. Secrets do profilu ani do Gitu nepatří.
+- Mandáty jsou trvalé, scoped a odvolatelné (0089). Nový nebo širší mandát
+  potvrzuje člověk v Dashboardu Lazurio účtem s čerstvým ověřením, mimo Osobní
+  Prostředí, ve kterém Buddy běží (0180); Buddy si ho sám nevydá ani
+  nerozšíří.
+- Všechny přímé konverzace člověka s Buddym jsou jedna konverzace. Spolu
+  s pamětí jsou obsahem Personalspace. Nikdo z provozu Lazuria nečte
+  konverzace ani gbrain a neposuzuje jednotlivá rozhodnutí Buddyho; ověřuje se
+  provoz, privacy a obnovitelnost Osobního Prostředí.
 
-### Owner kroky
+Dosah Buddyho, kanály, bublinu a orchestraci drží Lazurio decision 0210;
+tento manuál popisuje jen vazbu na Personalspace.
 
-Vlastník:
+### Blok `buddy` v `personal.gen3.json`
 
-1. dokončí a zvaliduje private Personalspace a private gbrain podle tohoto
-   manuálu;
-2. požádá o hosted Buddyho a vědomě odsouhlasí cenu, region a zdroje, které
-   Buddymu deleguje;
-3. vlastní private secret-free profil repo `<login>/<login>-buddy`, společně
-   s Buddym doplní `CONSTITUTION.md` a `MANDATES.md` a schválí teach-back jeho
-   role;
-4. přes owner-controlled surface mimo Buddy runtime write custody přijme exact
-   profile commit; Buddy může změnu mandátu draftovat, ale nemůže si ji sám
-   aktivovat;
-5. přijme, že hosted Zulip je privátní safe space právě pro něj a Buddyho;
-6. přijme dedikovaný Hetzner VPS jako cílovou topologii GEN2 i GEN3; nejde o
-   přechodnou fázi před pooled hostingem;
-7. potvrdí, že základní instalace používá pouze Zulip. Telegram ani voice se
-   neinstalují; Telegram lze později výslovně nastavit přes Hermes settings;
-8. provede vlastní provider login bezpečným kanálem, až ho runbook vyžádá.
+Personalspace s Buddym ho deklaruje blokem `buddy`. Ten se přidává pull
+requestem do Personalspace, až má vlastník Buddyho v Osobním Prostředí;
+bootstrap ho nezakládá a manifest s ním odmítne přepsat. Tvar podle 0210:
 
-Vlastník lokálně neinstaluje ani nespouští Buddyho, Hermes, gateway nebo
-hosted Buddy gbrain MCP. Owner-gated lokální gbrain aktivace z předchozí sekce
-zůstává samostatnou funkcí Personalspace; nesmí se vydávat za hosted Buddy
-runtime. Lokální Buddy checkout je pouze owner custody/editace zdrojů.
+```json
+{
+  "buddy": {
+    "slug": "<buddy-slug>",
+    "gbrain_path": "gbrain",
+    "path": "buddy",
+    "repository": {
+      "github_repo": "<login>/<login>-buddy",
+      "visibility": "private",
+      "mount_strategy": "doctor-managed-nested-repo"
+    },
+    "runtime": {
+      "deployment_target": "owner-personal-environment"
+    },
+    "hermes": {
+      "software_repo": "Lazurio/hermes-agent",
+      "profile_format": "hermes-profile-distribution",
+      "profile_path": "buddy"
+    }
+  }
+}
+```
 
-### Platform-operator kroky
-
-Platform operátor podle runbooku:
-
-1. přidělí dedikovaný VPS a nastaví backup;
-2. nastaví DNS, TLS a tailnet-only admin přístup;
-3. vydá per-host least-privilege deployment credential;
-4. materializuje pouze tři private owner repozitáře a verzovaný Buddy runtime;
-5. uloží secrets, sessions a runtime databáze mimo Git;
-6. nejdřív ověří reálný Hermes ↔ gbrain MCP write/read/use tok nad syntetickým
-   artefaktem bez osobního obsahu;
-7. nastaví Zulip pro právě jednoho Principála a Buddyho, aniž čte nebo
-   exportuje jeho soukromý obsah;
-8. ověří reálný tok gbrain ↔ Hermes ↔ Zulip, restart po rebootu,
-   backup/restore, rollback, profilový kontrakt a absenci checkoutu Organizace.
-
-### Viditelné `BLOCKED` gaty
-
-- **BLOCKED — interní readiness:** CAC-0072 named pilot nesmí pokračovat,
-  dokud interní Buddy GEN2 proving host nemá doložený `GO` nad celým
-  readiness checklistem.
-- **BLOCKED — founder:** konkrétní host čeká na explicitní potvrzení
-  ceny/nákupu VPS, regionu, DNS, Tailscale, GitHub credential hranice a
-  provider login postupu.
-- **BLOCKED — operator evidence:** host není hotový, dokud testy reálného
-  runtime, private Zulipu, rebootu, backup/restore, rollbacku,
-  no-org-checkoutu, Buddy profilu a secret-free Gitu neprošly. Canned nebo
-  placeholder odpověď není `PASS`.
-- **BLOCKED — Buddy GEN3 automatizace:** Dashboard `create-new` není připravený
-  k použití, dokud stejný machine-readable verification framework neprokáže,
-  že deterministicky splní kontrakt odvozený z manuálních Buddy GEN2 hostů.
-
-Tyto gaty neblokují localhost Personalspace bez Buddyho. Runbook ani tento
-manuál samy žádnou founder akci neautorizují.
-
-Verifier ani platform operátor neposuzuje jednotlivá Buddy rozhodnutí a
-nečte privátní chat nebo gbrain. Ověřuje instalaci, privacy, lifecycle a
-obnovitelnost; morální kontrakt přijímá Principál přes teach-back.
-
-Aktuální veřejné Lazurio schema už drží Buddyho jako volitelný blok; hosted
-gaty proto neblokují localhost Personalspace bez Buddyho.
+Doctor (`personalspace.profile_materialization`) i statická kontrola instance
+ověří, že profilové repo patří vlastníkovi a je private, že Buddy běží
+v Osobním Prostředí vlastníka a že Hermes je z forku. Pole skončeného modelu
+odmítnou s odkazem na 0210: `runtime.deployment_target:
+owner-dedicated-personalspace-vps`, `runtime.local_execution` a
+`runtime.github_repo` (runtime z Resident distribuce). Deklarace v manifestu
+přitom není důkaz běhu: jestli Buddy v Osobním Prostředí opravdu běží, se
+prokazuje operací.
 
 ## Done definition
 
@@ -410,5 +395,5 @@ gaty proto neblokují localhost Personalspace bez Buddyho.
 - `bun run check:instance` a po owner-gated aktivaci také
   `gbrain doctor --json` prošly.
 - Žádný secret ani runtime DB/index není trackovaný.
-- Hosted Buddy GEN2 ani Buddy GEN3 nejsou podmínkou dokončeného owner
-  bootstrapu; jejich `BLOCKED` stav se reportuje odděleně.
+- Buddy není podmínkou dokončeného owner bootstrapu; přichází s Osobním
+  Prostředím.

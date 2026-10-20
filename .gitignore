@@ -38,8 +38,9 @@ __pycache__/
 # Super-repo ho nikdy netrackuje jako gitlink ani běžný adresář.
 gbrain/
 
-# Volitelný private Buddy profile je také nested checkout. CAC-0071 jej
-# nevytváří, ale existující hosted instance ho nesmí omylem trackovat.
+# Private secret-free profil Buddyho (<login>/<login>-buddy) je také nested
+# checkout. Bootstrap ho nevytváří, ale Personalspace s Buddym ho nesmí omylem
+# trackovat.
 buddy/
 
 # Soukromé osobní moduly jsou Doctor-managed nested checkouty.

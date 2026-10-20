@@ -2,12 +2,16 @@ import { expect, test } from "bun:test";
 import { posix, win32 } from "path";
 
 import {
+  BUDDY_DEPLOYMENT_TARGET,
+  BUDDY_HERMES_SOFTWARE_REPO,
+  BUDDY_PROFILE_FORMAT,
   DOCTOR_COMMAND,
   DOCTOR_DECLARATION_SCHEMA_VERSION,
   DOCTOR_SCOPE_TYPE,
   NESTED_REPO_STRATEGY,
   PERSONAL_SCHEMA_VERSION,
   appendMissingLines,
+  buddyStateIssues,
   buildModulesManifest,
   buildPersonalConfig,
   doctorDeclarationIssues,
@@ -107,7 +111,7 @@ test("bootstrap rerun zachová custom gbrain binding bez tichého resetu", () =>
   });
 });
 
-test("CAC-0071 bootstrap odmítne přepsat Buddy-enabled Personalspace", () => {
+test("bootstrap odmítne přepsat Personalspace s blokem buddy (decision 0210)", () => {
   expect(() => resolveBootstrapRepositoryBindings({
     login: "example",
     personal: {
@@ -118,7 +122,7 @@ test("CAC-0071 bootstrap odmítne přepsat Buddy-enabled Personalspace", () => {
       installGbrain: false,
       gbrainRepo: null,
     },
-  })).toThrow("CAC-0072");
+  })).toThrow("decision 0210");
   expect(() => resolveBootstrapRepositoryBindings({
     login: "example",
     personal: {
@@ -129,7 +133,7 @@ test("CAC-0071 bootstrap odmítne přepsat Buddy-enabled Personalspace", () => {
       installGbrain: false,
       gbrainRepo: null,
     },
-  })).toThrow("CAC-0072");
+  })).toThrow("decision 0210");
 });
 
 test("bootstrap ignoruje template placeholder binding jiného ownera", () => {
@@ -219,28 +223,9 @@ test("bootstrap vytvoří validní Personalspace bez Buddyho", () => {
   })).toEqual([]);
 });
 
-test("CAC-0071 validátor deleguje Buddy binding do CAC-0072", () => {
-  const personal = buildPersonalConfig(personalTemplate, {
-    login: "example",
-    displayName: "Example Owner",
-  });
-  personal.buddy = { slug: "example-buddy", gbrain_path: "gbrain" };
-  const manifest = buildModulesManifest({
-    personal_generation: "gen3",
-    owner: "owner-github-username",
-    module_slots: [],
-  }, "example");
-  expect(validatePersonalState(personal, manifest).some(
-    (failure) => failure.includes("CAC-0072"),
-  )).toBe(true);
-});
-
-test("hosted validátor přijme explicitní owner Buddy profil bez lokálního runtime", () => {
-  const personal = buildPersonalConfig(personalTemplate, {
-    login: "example",
-    displayName: "Example Owner",
-  });
-  personal.buddy = {
+/** Blok `buddy` tak, jak ho po Lazurio decision 0210 deklaruje Personalspace s Buddym. */
+function personalEnvironmentBuddy(overrides = {}) {
+  return {
     slug: "example-buddy",
     gbrain_path: "gbrain",
     path: "buddy",
@@ -249,23 +234,78 @@ test("hosted validátor přijme explicitní owner Buddy profil bez lokálního r
       visibility: "private",
       mount_strategy: NESTED_REPO_STRATEGY,
     },
-    runtime: {
-      github_repo: "HumanAndMachines/Buddy_GEN2",
-      deployment_target: "owner-dedicated-personalspace-vps",
-      local_execution: "forbidden",
-    },
+    runtime: { deployment_target: BUDDY_DEPLOYMENT_TARGET },
     hermes: {
-      software_repo: "Lazurio/hermes-agent",
-      profile_format: "hermes-profile-distribution",
+      software_repo: BUDDY_HERMES_SOFTWARE_REPO,
+      profile_format: BUDDY_PROFILE_FORMAT,
       profile_path: "buddy",
     },
+    ...overrides,
   };
+}
+
+function personalWithBuddy(buddy) {
+  const personal = buildPersonalConfig(personalTemplate, {
+    login: "example",
+    displayName: "Example Owner",
+  });
+  personal.buddy = buddy;
   const manifest = buildModulesManifest({
     personal_generation: "gen3",
     owner: "owner-github-username",
     module_slots: [],
   }, "example");
-  expect(validatePersonalState(personal, manifest, { buddyMode: "hosted" })).toEqual([]);
+  return { personal, manifest };
+}
+
+test("validátor přijme Buddyho v Osobním Prostředí s Hermesem z forku (decision 0210)", () => {
+  const { personal, manifest } = personalWithBuddy(personalEnvironmentBuddy());
+  expect(BUDDY_DEPLOYMENT_TARGET).toBe("owner-personal-environment");
+  expect(BUDDY_HERMES_SOFTWARE_REPO).toBe("Lazurio/hermes-agent");
+  expect(validatePersonalState(personal, manifest)).toEqual([]);
+});
+
+test("validátor odmítne Buddyho na dedikované VPS i pole skončeného modelu (decision 0210)", () => {
+  // Přesně ten blok, který platil před 0210: Buddy na vlastní VPS, runtime
+  // z Resident distribuce a zákaz lokálního běhu.
+  const { personal, manifest } = personalWithBuddy(personalEnvironmentBuddy({
+    runtime: {
+      github_repo: "HumanAndMachines/Lazurio",
+      deployment_target: "owner-dedicated-personalspace-vps",
+      local_execution: "forbidden",
+    },
+  }));
+  const failures = validatePersonalState(personal, manifest);
+  expect(failures).toHaveLength(3);
+  expect(failures.some((failure) => failure.startsWith("buddy.runtime.deployment_target musí být owner-personal-environment"))).toBe(true);
+  expect(failures.some((failure) => failure.startsWith("buddy.runtime.local_execution skončilo"))).toBe(true);
+  expect(failures.some((failure) => failure.startsWith("buddy.runtime.github_repo skončilo"))).toBe(true);
+});
+
+test("Buddy bere Hermes z forku Lazurio/hermes-agent, ne přímo z upstreamu", () => {
+  const { personal, manifest } = personalWithBuddy(personalEnvironmentBuddy({
+    hermes: {
+      software_repo: "NousResearch/hermes-agent",
+      profile_format: BUDDY_PROFILE_FORMAT,
+      profile_path: "buddy",
+    },
+  }));
+  expect(validatePersonalState(personal, manifest)).toEqual([
+    "buddy.hermes.software_repo musí být fork Lazurio/hermes-agent (Lazurio decision 0210)",
+  ]);
+});
+
+test("neúplný nebo cizí Buddy binding je vada, ne tichý průchod", () => {
+  const { personal, manifest } = personalWithBuddy({ slug: "example-buddy", gbrain_path: "gbrain" });
+  const partial = validatePersonalState(personal, manifest);
+  expect(partial).toContain("buddy.path musí být buddy");
+  expect(partial).toContain("buddy.repository.github_repo musí být explicitní owner/repo");
+  expect(partial.some((failure) => failure.startsWith("buddy.runtime.deployment_target"))).toBe(true);
+  expect(partial.some((failure) => failure.startsWith("buddy.hermes.software_repo"))).toBe(true);
+  expect(buddyStateIssues(personalEnvironmentBuddy({
+    repository: { github_repo: "other/other-buddy", visibility: "private", mount_strategy: NESTED_REPO_STRATEGY },
+  }), "example")).toEqual(["Buddy profile repo musí patřit vlastníkovi Personalspace"]);
+  expect(buddyStateIssues("mattychus", "example")).toEqual(["buddy musí být objekt"]);
 });
 
 test("validace odmítne mount cizího Personalspace", () => {
