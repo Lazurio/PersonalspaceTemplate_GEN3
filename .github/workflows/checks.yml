@@ -13,13 +13,18 @@ concurrency:
 permissions:
   contents: read
 
+# Every change runs the contract and tests on Linux, the cheapest GitHub
+# Actions minutes. A Personalspace created from this template is a private
+# repository on its owner's own GitHub account, whose free tier counts Windows
+# minutes twice, so the Windows run is windows-portability.yml, only for pull
+# requests that change code.
 jobs:
   template-contract:
     name: template contract (${{ matrix.os }})
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest]
+        os: [ubuntu-latest]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
