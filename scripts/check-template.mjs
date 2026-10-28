@@ -1,5 +1,5 @@
 import { existsSync } from "fs";
-import { readFile } from "fs/promises";
+import { readFile, readdir } from "fs/promises";
 import { join } from "path";
 
 import { runCommand } from "./command-runner.mjs";
@@ -16,6 +16,7 @@ import {
   PERSONALSPACE_TEMPLATE_REPO,
   PERSONALSPACE_TEMPLATE_VERSION,
   gitlinkPaths,
+  githubWorkflowWindowsMacosTriggerIssues,
   modulePortPoolIssues,
   trackedPathPrivacyIssues,
   trackedTextPrivacyIssues,
@@ -71,6 +72,16 @@ expect(packageJson.packageManager === "bun@1.4.2", "packageManager musí vlastni
 expect(packageJson.engines?.bun === "1.4.2", "engines.bun musí odpovídat exact Bun 1.4.2");
 expect(checksWorkflow.includes("bun-version-file: package.json"), "CI musí číst Bun verzi z package.json");
 expect(!checksWorkflow.includes("bun-version:"), "CI nesmí držet druhý hardcoded Bun pin");
+const workflowFiles = (await readdir(join(root, ".github", "workflows"), { withFileTypes: true }))
+  .filter((entry) => entry.isFile() && /\.ya?ml$/i.test(entry.name))
+  .map((entry) => entry.name)
+  .sort();
+for (const name of workflowFiles) {
+  const workflowContent = await readFile(join(root, ".github", "workflows", name), "utf8");
+  for (const issue of githubWorkflowWindowsMacosTriggerIssues(`.github/workflows/${name}`, workflowContent)) {
+    expect(false, issue);
+  }
+}
 
 const staged = runCommand("git", ["ls-files", "-s"], { cwd: root }).stdout;
 const gitlinks = gitlinkPaths(staged);
