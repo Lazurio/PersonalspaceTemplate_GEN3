@@ -18,6 +18,7 @@ import {
   expectedIdentity,
   PERSONAL_MODULE_PORT_POOL,
   gitlinkPaths,
+  githubWorkflowWindowsMacosTriggerIssues,
   inferMountLayout,
   modulePortPoolIssues,
   parseGitHubRemote,
@@ -411,6 +412,84 @@ test("gitlink parser a ignore merger jsou deterministické", () => {
     "160000 def 0\tgbrain",
   ].join("\n"))).toEqual(["gbrain"]);
   expect(appendMissingLines("existing/\r\n", ["existing/", ".cache/"])).toBe("existing/\n.cache/\n");
+});
+
+test("Windows a macOS běží jen v pull_request s paths a ve workflow_dispatch", () => {
+  const rule = "Windows a macOS patří jen do pull_request s paths na kód a workflow_dispatch (minuty GitHub Actions)";
+  expect(githubWorkflowWindowsMacosTriggerIssues(".github/workflows/checks.yml", `
+on:
+  pull_request:
+  push:
+    branches: [main]
+jobs:
+  template-contract:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: \${{ matrix.os }}
+    steps:
+      - run: bun run check
+`)).toEqual([
+    `GitHub Actions workflow .github/workflows/checks.yml spouští Windows nebo macOS při pull_request bez paths, push; ${rule}`,
+  ]);
+  expect(githubWorkflowWindowsMacosTriggerIssues(".github/workflows/nightly.yaml", `
+on:
+  schedule:
+    - cron: "0 3 * * *"
+  workflow_dispatch:
+jobs:
+  nightly:
+    runs-on: macos-14
+    steps:
+      - run: bun test
+`)).toEqual([
+    `GitHub Actions workflow .github/workflows/nightly.yaml spouští Windows nebo macOS při schedule; ${rule}`,
+  ]);
+  expect(githubWorkflowWindowsMacosTriggerIssues(".github/workflows/windows-portability.yml", `
+on:
+  pull_request:
+    paths:
+      - "scripts/**"
+      - ".github/workflows/**"
+  workflow_dispatch:
+jobs:
+  template-contract:
+    runs-on: windows-latest
+    steps:
+      - run: bun run check
+`)).toEqual([]);
+  expect(githubWorkflowWindowsMacosTriggerIssues(".github/workflows/checks.yml", `
+on:
+  pull_request:
+  push:
+    branches: [main]
+  schedule:
+    - cron: "0 3 * * *"
+jobs:
+  template-contract:
+    strategy:
+      matrix:
+        os: [ubuntu-latest]
+    runs-on: \${{ matrix.os }}
+    steps:
+      - run: bun run check
+`)).toEqual([]);
+  const violations = [
+    ["on: [push, workflow_dispatch]\njobs:\n  check:\n    runs-on: [self-hosted, Windows]\n", "push"],
+    [
+      "on:\n  merge_group:\n  pull_request_target:\n    paths: []\njobs:\n  check:\n    runs-on: ubuntu-latest\n    strategy:\n      matrix:\n        include:\n          - os: macos-latest\n",
+      "merge_group, pull_request_target bez paths",
+    ],
+    ["on:\n  pull_request:\n    paths-ignore: [notes/**]\njobs:\n  check:\n    runs-on: windows-2022\n", "pull_request bez paths"],
+  ];
+  for (const [workflow, triggers] of violations) {
+    expect(githubWorkflowWindowsMacosTriggerIssues(".github/workflows/x.yml", workflow)).toEqual([
+      `GitHub Actions workflow .github/workflows/x.yml spouští Windows nebo macOS při ${triggers}; ${rule}`,
+    ]);
+  }
+  expect(githubWorkflowWindowsMacosTriggerIssues(".github/workflows/broken.yml", "on: [push\njobs: {")).toEqual([
+    "GitHub Actions workflow .github/workflows/broken.yml nejde přečíst jako YAML, takže nejde ověřit, kdy spouští Windows nebo macOS",
+  ]);
 });
 
 test("privacy guard odmítne trackované credentials, runtime DB a high-confidence token", () => {

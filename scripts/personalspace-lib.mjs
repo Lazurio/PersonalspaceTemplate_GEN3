@@ -552,6 +552,58 @@ export function pendingRepositoryInvitationLabels(lines) {
     .sort((left, right) => left.localeCompare(right));
 }
 
+const WINDOWS_OR_MACOS_RUNNER = /\b(?:windows|macos)(?:-|\b)/i;
+
+// A Personalspace is a private repository on its owner's own GitHub account,
+// whose free tier counts Windows minutes twice and macOS minutes ten times.
+// Linux runs every gate for every change; Windows and macOS run only for pull
+// requests whose positive paths filter names code, the toolchain or
+// workflows, and on workflow_dispatch.
+export function githubWorkflowWindowsMacosTriggerIssues(file, content) {
+  let workflow;
+  try {
+    workflow = Bun.YAML.parse(content);
+  } catch {
+    return [`GitHub Actions workflow ${file} nejde přečíst jako YAML, takže nejde ověřit, kdy spouští Windows nebo macOS`];
+  }
+  const jobs = workflow?.jobs && typeof workflow.jobs === "object" && !Array.isArray(workflow.jobs)
+    ? Object.values(workflow.jobs)
+    : [];
+  const runsWindowsOrMacos = jobs.some((job) => WINDOWS_OR_MACOS_RUNNER.test(
+    JSON.stringify([job?.["runs-on"] ?? null, job?.strategy?.matrix ?? null]),
+  ));
+  if (!runsWindowsOrMacos) return [];
+  const forbiddenTriggers = workflowTriggerEntries(workflow?.on).flatMap(([name, config]) => {
+    if (["push", "schedule", "merge_group"].includes(name)) return [name];
+    if (["pull_request", "pull_request_target"].includes(name) && !hasPositivePathsFilter(config)) {
+      return [`${name} bez paths`];
+    }
+    return [];
+  });
+  return forbiddenTriggers.length === 0
+    ? []
+    : [`GitHub Actions workflow ${file} spouští Windows nebo macOS při ${forbiddenTriggers.join(", ")}; Windows a macOS patří jen do pull_request s paths na kód a workflow_dispatch (minuty GitHub Actions)`];
+}
+
+function workflowTriggerEntries(triggers) {
+  if (typeof triggers === "string") return [[triggers, null]];
+  if (Array.isArray(triggers)) {
+    return triggers.filter((name) => typeof name === "string").map((name) => [name, null]);
+  }
+  if (triggers && typeof triggers === "object") return Object.entries(triggers);
+  return [];
+}
+
+function hasPositivePathsFilter(config) {
+  return Boolean(config)
+    && typeof config === "object"
+    && !Array.isArray(config)
+    && Array.isArray(config.paths)
+    && config.paths.some((pattern) => typeof pattern === "string"
+      && pattern.trim().length > 0
+      && !pattern.trim().startsWith("!"));
+}
+
 export function appendMissingLines(existing, requiredLines) {
   const normalized = typeof existing === "string" ? existing.replace(/\r\n/g, "\n") : "";
   const present = new Set(normalized.split("\n").map((line) => line.trim()));
