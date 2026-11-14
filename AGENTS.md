@@ -47,9 +47,10 @@ nepoužívá vůbec.
   ani hostingu, verifieru, jinému člověku ani jinému Buddymu. Buddyho oslovuje
   jen jeho člověk; skupinové konverzace Buddyů a zastupování vůči druhým lidem
   potřebují samostatné rozhodnutí.
-- **Provoz.** Lazurio spravuje Osobní Prostředí (instalaci, aktualizace,
-  obnovu), ne každodenní rozhodování Buddyho, a ověřuje provoz, ne obsah
-  konverzací. Secrets Buddyho nepatří do profilu ani do Gitu.
+- **Provoz.** Osobní Prostředí spravuje jeho člověk; Lazurio ho provozuje
+  (instalace, aktualizace, obnova; 0245), ne každodenní rozhodování Buddyho,
+  a ověřuje provoz, ne obsah konverzací. Secrets Buddyho nepatří do profilu
+  ani do Gitu.
 
 Deklarace Buddyho v `personal.gen3.json` (blok `buddy`) není důkaz, že Buddy
 běží; to se prokazuje operací. Tvar bloku a kontroly drží
@@ -72,8 +73,8 @@ Co tu platí:
   pokrývá, nepotvrzuješ znovu — Buddy ti ji pravdivě reportuje.
 - **Buddy je osobní, ne firemní.** Je součástí tvého Osobního Prostředí,
   oslovuješ ho jen ty a jedná tvým jménem podle scoped, čitelných a
-  odvolatelných mandátů; Lazurio spravuje Osobní Prostředí, ne jeho každodenní
-  rozhodování. Firemní kontext a rozhodnutí patří do Organizace, ne sem.
+  odvolatelných mandátů; Osobní Prostředí spravuješ ty a Lazurio ho provozuje,
+  ne jeho každodenní rozhodování. Firemní kontext a rozhodnutí patří do Organizace, ne sem.
 - **Přístupy drží GitHub a proces, ne vymyšlené mechanismy.** GitHub granty
   jsou jediná autorita přístupů k repozitářům; žádný agent nezavádí druhou
   autoritu, nepojmenovanou roli ani neohraničený přístup. Co nejde zajistit
